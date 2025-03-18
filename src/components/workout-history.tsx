@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useWorkout } from '@/lib/workout-context';
 import { supabase } from '@/lib/supabase';
 import { Button } from './ui/button';
@@ -24,9 +24,20 @@ interface WorkoutHistoryProps {
   exerciseName: string;
 }
 
+interface WorkoutSet {
+  id: string;
+  created_at: string;
+  username: string;
+  exercise: string;
+  warmup: boolean;
+  weight: number;
+  reps: number;
+  goal: number;
+}
+
 export function WorkoutHistory({ exerciseName }: WorkoutHistoryProps) {
   const { currentUser } = useWorkout();
-  const [history, setHistory] = useState<any[]>([]);
+  const [history, setHistory] = useState<WorkoutSet[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   
   // Load history when dialog opens
@@ -100,7 +111,7 @@ export function WorkoutHistory({ exerciseName }: WorkoutHistoryProps) {
                       className="border-b border-white/10 last:border-0 hover:bg-white/5"
                     >
                       <TableCell className="font-medium text-white">{formatDate(set.created_at)}</TableCell>
-                      <TableCell className="text-white">{set.warmup}</TableCell>
+                      <TableCell className="text-white">{set.warmup ? 'Yes' : 'No'}</TableCell>
                       <TableCell className="text-white">{set.weight}</TableCell>
                       <TableCell className="text-white">{set.reps}</TableCell>
                       <TableCell className="text-white">{set.goal}</TableCell>
