@@ -16,7 +16,7 @@ export function ExerciseAccordion() {
   return (
     <div className="mt-12 mb-16 pb-8">
       <h2 className="text-3xl font-bold mb-8 text-center tracking-tight">
-        {selectedDay}'s Workout for {currentUser}
+        {selectedDay}&apos;s Workout for {currentUser}
       </h2>
       <Accordion type="single" collapsible className="w-full space-y-6">
         {exercisesForSelectedDay.map((exercise, index) => (

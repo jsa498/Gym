@@ -97,7 +97,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   };
 
   const addSetToExercise = async (exerciseName: string, set: ExerciseSet) => {
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('workout_sets')
       .insert([
         {

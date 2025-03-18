@@ -1,4 +1,4 @@
-import { Exercise, ExerciseSet, User } from './types';
+import { ExerciseSet, User } from './types';
 
 const getStorageKey = (user: User, exerciseName: string) => `${user}-${exerciseName}`;
 
