@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useWorkout } from '@/lib/workout-context';
 import { ExerciseSet } from '@/lib/types';
-import { getLastSet } from '@/lib/storage';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -13,7 +12,7 @@ interface ExerciseFormProps {
 }
 
 export function ExerciseForm({ exerciseName }: ExerciseFormProps) {
-  const { currentUser, addSetToExercise } = useWorkout();
+  const { currentUser, addSetToExercise, getSetsForExercise } = useWorkout();
   const [form, setForm] = useState<ExerciseSet>({
     warmup: '',
     weight: '',
@@ -21,15 +20,21 @@ export function ExerciseForm({ exerciseName }: ExerciseFormProps) {
     goal: ''
   });
 
-  // Load the last set to prepopulate the form
+  // Load the last set to prefill specific form fields (excluding reps)
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    // Get sets from the workout context instead of localStorage
+    const sets = getSetsForExercise(exerciseName);
+    const lastSet = sets.length > 0 ? sets[sets.length - 1] : null;
     
-    const lastSet = getLastSet(currentUser, exerciseName);
     if (lastSet) {
-      setForm(lastSet);
+      setForm({
+        warmup: lastSet.warmup,
+        weight: lastSet.weight,
+        reps: '', // Don't prefill reps as requested
+        goal: lastSet.goal
+      });
     }
-  }, [currentUser, exerciseName]);
+  }, [exerciseName, getSetsForExercise]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
