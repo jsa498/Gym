@@ -9,31 +9,56 @@ import {
   SelectValue 
 } from '@/components/ui/select';
 import { Day } from '@/lib/types';
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
 
 export function DaySelector() {
   const { selectedDay, setSelectedDay, currentUser } = useWorkout();
+  const [availableDays, setAvailableDays] = useState<Day[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   
-  // Get available days based on user
-  const getAvailableDays = (): Day[] => {
-    const commonDays: Day[] = ['Monday', 'Wednesday', 'Thursday'];
-    
-    // Saturday is only available for Babli
-    if (currentUser === 'Babli') {
-      return [...commonDays, 'Saturday'];
-    }
-    
-    return commonDays;
-  };
-  
-  const days = getAvailableDays();
-  
-  // If Mottu has Saturday selected but switches from Babli, we need to reset the day
-  // This ensures Mottu never has Saturday selected since he doesn't workout that day
-  React.useEffect(() => {
-    if (currentUser === 'Mottu' && selectedDay === 'Saturday') {
-      setSelectedDay('Monday');
-    }
+  // Fetch available days for the current user from the database
+  useEffect(() => {
+    const fetchUserDays = async () => {
+      setIsLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('user_days')
+          .select('day')
+          .eq('username', currentUser)
+          .order('day');
+        
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+          // Extract the days and convert to Day type
+          const days = data.map(item => item.day) as Day[];
+          setAvailableDays(days);
+          
+          // If the selected day isn't in the available days, set to the first day
+          if (days.length > 0 && !days.includes(selectedDay)) {
+            setSelectedDay(days[0]);
+          }
+        } else {
+          // Fallback to default days as a last resort
+          const defaultDays: Day[] = currentUser === 'Babli' 
+            ? ['Monday', 'Wednesday', 'Thursday', 'Saturday'] 
+            : ['Monday', 'Wednesday', 'Thursday'];
+          setAvailableDays(defaultDays);
+        }
+      } catch (error) {
+        console.error('Error fetching user days:', error);
+        // Fallback to default days in case of error
+        const defaultDays: Day[] = currentUser === 'Babli' 
+          ? ['Monday', 'Wednesday', 'Thursday', 'Saturday'] 
+          : ['Monday', 'Wednesday', 'Thursday'];
+        setAvailableDays(defaultDays);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchUserDays();
   }, [currentUser, selectedDay, setSelectedDay]);
 
   return (
@@ -42,12 +67,13 @@ export function DaySelector() {
       <Select
         value={selectedDay}
         onValueChange={(value) => setSelectedDay(value as Day)}
+        disabled={isLoading}
       >
         <SelectTrigger className="w-48 h-14 text-lg bg-transparent border-2 border-white/20 hover:border-white focus:border-white focus:ring-0 transition-colors">
-          <SelectValue placeholder="Select a day" />
+          <SelectValue placeholder={isLoading ? "Loading..." : "Select a day"} />
         </SelectTrigger>
         <SelectContent className="bg-black/90 backdrop-blur-sm border-2 border-white/20">
-          {days.map((day) => (
+          {availableDays.map((day) => (
             <SelectItem 
               key={day} 
               value={day}

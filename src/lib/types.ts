@@ -1,6 +1,6 @@
 export type User = 'Mottu' | 'Babli';
 
-export type Day = 'Monday' | 'Wednesday' | 'Thursday' | 'Saturday';
+export type Day = 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | 'Sunday';
 
 export interface ExerciseSet {
   warmup: string;
@@ -20,6 +20,7 @@ export type ExercisesByDay = {
 
 export const exercises: ExercisesByDay = {
   Monday: ['Chest Press', 'Incline Dumbbell Press', 'Lateral Raises', 'Bicep Curls'],
+  Tuesday: [],
   Wednesday: [
     'Hip Adductor Curls',
     'Hip Inductor Curls',
@@ -36,9 +37,11 @@ export const exercises: ExercisesByDay = {
     'Dips',
     'Rear Delt Flies'
   ],
+  Friday: [],
   Saturday: [
     'Glute Extensions',
     'Hip Thrusts',
     'Calf Raises'
-  ]
+  ],
+  Sunday: []
 }; 
