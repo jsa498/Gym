@@ -10,6 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from './ui/table';
+import { WorkoutHistory } from './workout-history';
 
 interface SetListProps {
   exerciseName: string;
@@ -23,9 +24,15 @@ export function SetList({ exerciseName }: SetListProps) {
     return null;
   }
 
+  // Get only the last set
+  const lastSet = sets[sets.length - 1];
+
   return (
     <div className="mt-10">
-      <h3 className="text-xl font-medium mb-4 text-white/80">Logged Sets</h3>
+      <div className="flex items-center mb-4">
+        <h3 className="text-xl font-medium text-white/80">Last Set</h3>
+        <WorkoutHistory exerciseName={exerciseName} />
+      </div>
       <div className="border-2 border-white/20 rounded-xl overflow-hidden bg-black/30 backdrop-blur-sm shadow-inner shadow-white/5">
         <Table>
           <TableHeader>
@@ -38,27 +45,24 @@ export function SetList({ exerciseName }: SetListProps) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sets.map((set, index) => (
-              <TableRow 
-                key={index} 
-                className="border-b border-white/10 last:border-0 hover:bg-white/5"
-              >
-                <TableCell className="font-medium">{set.warmup}</TableCell>
-                <TableCell>{set.weight}</TableCell>
-                <TableCell>{set.reps}</TableCell>
-                <TableCell>{set.goal}</TableCell>
-                <TableCell>
-                  <Button 
-                    variant="outline"
-                    size="sm"
-                    onClick={() => removeSetFromExercise(exerciseName, index)}
-                    className="border-white/20 bg-white/10 text-white hover:bg-white hover:text-black transition-colors"
-                  >
-                    Delete
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
+            <TableRow 
+              className="border-b border-white/10 last:border-0 hover:bg-white/5"
+            >
+              <TableCell className="font-medium">{lastSet.warmup}</TableCell>
+              <TableCell>{lastSet.weight}</TableCell>
+              <TableCell>{lastSet.reps}</TableCell>
+              <TableCell>{lastSet.goal}</TableCell>
+              <TableCell>
+                <Button 
+                  variant="outline"
+                  size="sm"
+                  onClick={() => removeSetFromExercise(exerciseName, sets.length - 1)}
+                  className="border-white/20 bg-white/10 text-white hover:bg-white hover:text-black transition-colors"
+                >
+                  Delete
+                </Button>
+              </TableCell>
+            </TableRow>
           </TableBody>
         </Table>
       </div>
