@@ -12,7 +12,7 @@ interface ExerciseFormProps {
 }
 
 export function ExerciseForm({ exerciseName }: ExerciseFormProps) {
-  const { currentUser, addSetToExercise, getSetsForExercise } = useWorkout();
+  const { addSetToExercise, getSetsForExercise } = useWorkout();
   const [form, setForm] = useState<ExerciseSet>({
     warmup: '',
     weight: '',
