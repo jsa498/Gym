@@ -52,7 +52,7 @@ export function SetList({ exerciseName }: SetListProps) {
                     variant="outline"
                     size="sm"
                     onClick={() => removeSetFromExercise(exerciseName, index)}
-                    className="border-white/20 hover:bg-white hover:text-black transition-colors"
+                    className="border-white/20 bg-white/10 text-white hover:bg-white hover:text-black transition-colors"
                   >
                     Delete
                   </Button>
