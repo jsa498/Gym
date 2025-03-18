@@ -76,9 +76,12 @@ export function WorkoutManagement() {
           // Create a new ExercisesByDay object with the correct structure
           const userExercises: ExercisesByDay = {
             Monday: [],
+            Tuesday: [],
             Wednesday: [],
             Thursday: [],
-            Saturday: []
+            Friday: [],
+            Saturday: [],
+            Sunday: []
           };
           
           // Fill in exercises from database
@@ -134,7 +137,7 @@ export function WorkoutManagement() {
       initialExpanded[day] = day === selectedDay;
     });
     setExpanded(initialExpanded);
-  }, []);
+  }, [selectedDay, workoutDays]);
 
   const toggleExpanded = (day: Day) => {
     setExpanded(prev => ({
@@ -389,8 +392,11 @@ export function WorkoutManagement() {
       setAvailableDays(updatedDays);
       setWorkoutDays(updatedDays);
       
-      const { [day]: _, ...remainingExercises } = workoutExercises;
-      setWorkoutExercises(remainingExercises as ExercisesByDay);
+      // Create a new object without the specified day
+      const remainingExercises = Object.fromEntries(
+        Object.entries(workoutExercises).filter(([key]) => key !== day)
+      ) as ExercisesByDay;
+      setWorkoutExercises(remainingExercises);
       
       // If the selected day for edit is removed, change to the first available day
       if (selectedDayForEdit === day && updatedDays.length > 0) {

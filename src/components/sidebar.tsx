@@ -8,10 +8,8 @@ import {
   SheetContent, 
   SheetHeader, 
   SheetTitle, 
-  SheetTrigger,
   SheetDescription,
   SheetFooter,
-  SheetClose
 } from '@/components/ui/sheet';
 import { Separator } from '@/components/ui/separator';
 import { useWorkout } from '@/lib/workout-context';
