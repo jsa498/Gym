@@ -896,27 +896,43 @@ export function WorkoutManagement() {
           <DialogHeader>
             <DialogTitle>Add Workout Days</DialogTitle>
             <DialogDescription className="text-white/70">
-              Select the days you want to add to your workout schedule.
+              Select one or more days to add to your workout schedule.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
+            <div className="mb-3 text-white/80 text-sm flex items-center">
+              <svg width="16" height="16" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" className="mr-1.5">
+                <path d="M7.49991 0.877045C3.84222 0.877045 0.877075 3.84219 0.877075 7.49988C0.877075 11.1575 3.84222 14.1227 7.49991 14.1227C11.1576 14.1227 14.1227 11.1575 14.1227 7.49988C14.1227 3.84219 11.1576 0.877045 7.49991 0.877045ZM1.82708 7.49988C1.82708 4.36686 4.36689 1.82704 7.49991 1.82704C10.6329 1.82704 13.1727 4.36686 13.1727 7.49988C13.1727 10.6329 10.6329 13.1727 7.49991 13.1727C4.36689 13.1727 1.82708 10.6329 1.82708 7.49988ZM7.49991 4.56249C7.77005 4.56249 7.99991 4.79235 7.99991 5.06249V7.49988L9.93741 8.9374C10.1596 9.10068 10.2127 9.41574 10.0495 9.63788C9.8862 9.86002 9.57114 9.91312 9.34901 9.74985L6.99991 8.06235C6.84534 7.95023 6.74991 7.77572 6.74991 7.59988V5.06249C6.74991 4.79235 6.97977 4.56249 7.49991 4.56249Z" fill="currentColor" fillRule="evenodd" clipRule="evenodd" />
+              </svg>
+              Click on multiple days to select them
+            </div>
             <div className="space-y-2 max-h-48 overflow-y-auto">
               {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
                 .filter(day => !availableDays.includes(day as Day))
                 .sort((a, b) => getDayOrder(a as Day) - getDayOrder(b as Day))
                 .map(day => (
-                  <Button 
-                    key={day} 
-                    variant={selectedDays.includes(day as Day) ? "default" : "outline"}
+                  <div 
+                    key={day}
                     onClick={() => toggleDaySelection(day as Day)}
-                    className={`w-full justify-start ${
+                    className={`flex items-center p-3 rounded-md cursor-pointer transition-colors ${
                       selectedDays.includes(day as Day) 
-                        ? "bg-white text-black hover:bg-white/90"
-                        : "bg-black/50 border-white/20 text-white hover:bg-white/20 hover:text-white"
+                        ? "bg-white/20 hover:bg-white/30"
+                        : "bg-black/50 border border-white/20 hover:bg-white/10"
                     }`}
                   >
-                    {day}
-                  </Button>
+                    <div className={`flex-shrink-0 w-5 h-5 mr-2 rounded flex items-center justify-center border ${
+                      selectedDays.includes(day as Day) 
+                        ? "bg-white border-white" 
+                        : "border-white/50"
+                    }`}>
+                      {selectedDays.includes(day as Day) && (
+                        <svg width="12" height="12" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M11.4669 3.72684C11.7558 3.91574 11.8369 4.30308 11.648 4.59198L7.39799 11.092C7.29783 11.2452 7.13556 11.3467 6.95402 11.3699C6.77247 11.3931 6.58989 11.3355 6.45446 11.2124L3.70446 8.71241C3.44905 8.48022 3.43023 8.08494 3.66242 7.82953C3.89461 7.57412 4.28989 7.55529 4.5453 7.78749L6.75292 9.79441L10.6018 3.90792C10.7907 3.61902 11.178 3.53795 11.4669 3.72684Z" fill="black" fillRule="evenodd" clipRule="evenodd" />
+                        </svg>
+                      )}
+                    </div>
+                    <span>{day}</span>
+                  </div>
                 ))}
             </div>
             {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
