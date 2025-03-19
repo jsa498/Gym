@@ -11,6 +11,7 @@ import {
   TableRow,
 } from './ui/table';
 import { WorkoutHistory } from './workout-history';
+import { Trash2 } from 'lucide-react';
 
 interface SetListProps {
   exerciseName: string;
@@ -41,7 +42,7 @@ export function SetList({ exerciseName }: SetListProps) {
               <TableHead className="text-white/70 font-medium text-sm">Weight (lbs)</TableHead>
               <TableHead className="text-white/70 font-medium text-sm">Reps</TableHead>
               <TableHead className="text-white/70 font-medium text-sm">Goal</TableHead>
-              <TableHead className="text-white/70 font-medium text-sm w-[100px]">Action</TableHead>
+              <TableHead className="text-white/70 font-medium text-sm w-[80px]">Action</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -57,9 +58,9 @@ export function SetList({ exerciseName }: SetListProps) {
                   variant="outline"
                   size="sm"
                   onClick={() => removeSetFromExercise(exerciseName, sets.length - 1)}
-                  className="border-white/20 bg-white/10 text-white hover:bg-white hover:text-black transition-colors"
+                  className="border-white/20 bg-white/10 text-white hover:bg-white hover:text-black transition-colors p-2 h-8 w-8"
                 >
-                  Delete
+                  <Trash2 size={16} />
                 </Button>
               </TableCell>
             </TableRow>
