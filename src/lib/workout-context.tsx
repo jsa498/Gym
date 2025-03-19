@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { Day, ExerciseSet, User, exercises as defaultExercises } from './types';
 import { supabase } from './supabase';
 
@@ -24,7 +24,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   const [exercisesByDay, setExercisesByDay] = useState<Record<Day, string[]>>(defaultExercises as Record<Day, string[]>);
 
   // Fetch exercises for the current user and day
-  const fetchExercisesForDay = async () => {
+  const fetchExercisesForDay = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('exercises')
@@ -59,7 +59,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         [selectedDay]: defaultExercises[selectedDay] || []
       }));
     }
-  };
+  }, [currentUser, selectedDay]);
 
   // Subscribe to real-time changes in exercises table
   useEffect(() => {
@@ -86,12 +86,12 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     return () => {
       supabase.removeChannel(exercisesChannel);
     };
-  }, [currentUser, selectedDay]);
+  }, [currentUser, selectedDay, fetchExercisesForDay]);
 
   // Initial fetch of exercises when user or day changes
   useEffect(() => {
     fetchExercisesForDay();
-  }, [currentUser, selectedDay]);
+  }, [fetchExercisesForDay]);
 
   // Subscribe to real-time changes in sets
   useEffect(() => {

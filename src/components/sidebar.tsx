@@ -208,7 +208,7 @@ export function Sidebar() {
         >
           <SheetContent 
             side="left" 
-            className={`bg-black/95 text-white border-r border-white/10 p-0 ${isMobile ? 'ml-0' : 'left-0 w-[400px]'} w-full max-w-full sm:w-[350px] sm:max-w-[80vw] lg:w-[400px] transition-transform duration-300 ease-in-out z-50`}
+            className={`bg-black/95 text-white border-r border-white/10 p-0 ${isMobile ? 'ml-0' : 'left-0 w-[400px]'} w-full max-w-full sm:w-[350px] sm:max-w-[80vw] lg:w-[400px] transition-transform duration-300 ease-in-out z-50 h-full overflow-y-auto`}
             onClick={(e) => {
               // Prevent ALL clicks inside SheetContent from closing the sidebar
               e.stopPropagation();
@@ -283,13 +283,13 @@ export function Sidebar() {
                         e.stopPropagation();
                         setActiveView(null);
                       }}
-                      className="mr-2 h-8 px-2 text-white hover:bg-white/10"
+                      className="mr-2 h-8 px-3 text-white/90 hover:bg-white/5 hover:text-white rounded-md transition-colors"
                     >
                       ← Back
                     </Button>
                   </div>
                   
-                  <div className="pt-2">
+                  <div className="pt-2 overflow-y-auto h-[calc(100vh-100px)]">
                     {renderActiveView()}
                   </div>
                 </div>

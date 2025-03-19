@@ -539,7 +539,7 @@ export function WorkoutManagement() {
   }
 
   return (
-    <div className="p-4" onClick={(e) => e.stopPropagation()}>
+    <div className="p-4 overflow-visible" onClick={(e) => e.stopPropagation()}>
       <h2 className="text-2xl font-bold text-white mb-6">Manage Workouts</h2>
       
       {/* User Selection Section */}

@@ -68,7 +68,7 @@ export function Settings() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-4 overflow-visible" onClick={(e) => e.stopPropagation()}>
       <h3 className="text-lg font-semibold text-white">Settings</h3>
       
       <div className="space-y-4">
