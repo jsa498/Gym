@@ -80,7 +80,10 @@ export function Settings() {
           <Button
             variant="outline"
             size="sm"
-            onClick={toggleTheme}
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleTheme();
+            }}
             className="border-white/20 bg-white/10 text-white hover:bg-white hover:text-black"
           >
             {theme === 'dark' ? (
@@ -109,7 +112,10 @@ export function Settings() {
             <Button
               variant="outline"
               disabled={isLoading}
-              onClick={clearAllData}
+              onClick={(e) => {
+                e.stopPropagation();
+                clearAllData();
+              }}
               className="w-full border-white/20 bg-white/10 text-white hover:bg-red-500 hover:text-white"
             >
               <Trash2 className="h-4 w-4 mr-2" />
@@ -124,7 +130,10 @@ export function Settings() {
             <Button
               variant="outline"
               disabled={isLoading}
-              onClick={resetApp}
+              onClick={(e) => {
+                e.stopPropagation();
+                resetApp();
+              }}
               className="w-full border-white/20 bg-white/10 text-white hover:bg-red-900 hover:text-white"
             >
               <Trash2 className="h-4 w-4 mr-2" />

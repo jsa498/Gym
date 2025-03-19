@@ -183,7 +183,7 @@ export function UserManagement() {
                   variant="outline" 
                   size="icon"
                   disabled={isLoading}
-                  onClick={handleUpdateUser}
+                  onClick={(e) => { e.stopPropagation(); handleUpdateUser(); }}
                   className="h-8 w-8 border-white/20 bg-white/10 text-white hover:bg-white hover:text-black"
                 >
                   <Save className="h-4 w-4" />
@@ -193,7 +193,7 @@ export function UserManagement() {
                   variant="outline" 
                   size="icon"
                   disabled={isLoading}
-                  onClick={() => startEditing(index)}
+                  onClick={(e) => { e.stopPropagation(); startEditing(index); }}
                   className="h-8 w-8 border-white/20 bg-white/10 text-white hover:bg-white hover:text-black"
                 >
                   <Edit className="h-4 w-4" />
@@ -204,7 +204,7 @@ export function UserManagement() {
                 variant="outline"
                 size="icon"
                 disabled={isLoading || user === currentUser}
-                onClick={() => handleDeleteUser(index)}
+                onClick={(e) => { e.stopPropagation(); handleDeleteUser(index); }}
                 className="h-8 w-8 border-white/20 bg-white/10 text-white hover:bg-destructive hover:text-white"
               >
                 <Trash2 className="h-4 w-4" />
@@ -229,7 +229,7 @@ export function UserManagement() {
           <Button 
             variant="outline"
             disabled={isLoading || !newUser.trim()}
-            onClick={handleAddUser}
+            onClick={(e) => { e.stopPropagation(); handleAddUser(); }}
             className="border-white/20 bg-white/10 text-white hover:bg-white hover:text-black"
           >
             <Plus className="h-4 w-4 mr-2" />

@@ -121,3 +121,21 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Sidebar animations */
+.sidebar-icon {
+  transition: all 0.2s ease-in-out;
+}
+
+.sidebar-icon:hover {
+  transform: scale(1.1);
+}
+
+/* Ensure smooth transitions for the sheet content */
+[data-side="left"].data-[state="open"]:animate-in {
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+[data-side="left"].data-[state="closed"]:animate-out {
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}

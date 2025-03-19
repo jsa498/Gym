@@ -476,7 +476,10 @@ export function WorkoutManagement() {
           <Button 
             variant="outline" 
             size="sm"
-            onClick={() => setDayManagementOpen(!dayManagementOpen)}
+            onClick={(e) => {
+              e.stopPropagation();
+              setDayManagementOpen(!dayManagementOpen);
+            }}
             className="bg-black/50 text-white hover:bg-white/20"
           >
             {dayManagementOpen ? 'Close' : 'Edit Days'}
@@ -494,7 +497,10 @@ export function WorkoutManagement() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => handleRemoveDay(day)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRemoveDay(day);
+                      }}
                       className="h-6 w-6 p-0 text-white/70 hover:text-white hover:bg-red-500/20"
                       disabled={availableDays.length <= 1 || isLoading}
                     >
@@ -510,7 +516,9 @@ export function WorkoutManagement() {
                 <Label htmlFor="newDay" className="text-white">Add New Day</Label>
                 <Select 
                   value={newDay} 
-                  onValueChange={(value) => setNewDay(value as Day)}
+                  onValueChange={(value) => {
+                    setNewDay(value as Day);
+                  }}
                 >
                   <SelectTrigger id="newDay" className="bg-black/50 border-white/20 text-white">
                     <SelectValue placeholder="Select a day" />
@@ -534,7 +542,10 @@ export function WorkoutManagement() {
               </div>
               <Button 
                 variant="default" 
-                onClick={handleAddDay}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleAddDay();
+                }}
                 disabled={availableDays.includes(newDay) || isLoading}
                 className="bg-blue-600 hover:bg-blue-700 text-white"
               >
@@ -556,7 +567,8 @@ export function WorkoutManagement() {
                   ? "bg-white/20 hover:bg-white/25" 
                   : "bg-white/5 hover:bg-white/10"
               }`}
-              onClick={() => {
+              onClick={(e) => {
+                e.stopPropagation();
                 toggleExpanded(day);
                 setSelectedDayForEdit(day);
               }}
@@ -583,7 +595,10 @@ export function WorkoutManagement() {
                           variant="ghost"
                           size="icon"
                           disabled={isLoading || index === 0}
-                          onClick={() => moveExercise(day, index, index - 1)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            moveExercise(day, index, index - 1);
+                          }}
                           className="h-7 w-7 text-white/70 hover:text-white hover:bg-white/10"
                         >
                           <ChevronUp className="h-4 w-4" />
@@ -592,7 +607,10 @@ export function WorkoutManagement() {
                           variant="ghost"
                           size="icon"
                           disabled={isLoading || index === workoutExercises[day].length - 1}
-                          onClick={() => moveExercise(day, index, index + 1)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            moveExercise(day, index, index + 1);
+                          }}
                           className="h-7 w-7 text-white/70 hover:text-white hover:bg-white/10"
                         >
                           <ChevronDown className="h-4 w-4" />
@@ -601,7 +619,10 @@ export function WorkoutManagement() {
                           variant="ghost"
                           size="icon"
                           disabled={isLoading}
-                          onClick={() => handleRemoveExercise(day, index)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRemoveExercise(day, index);
+                          }}
                           className="h-7 w-7 text-white/70 hover:text-red-500 hover:bg-white/10"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -616,7 +637,10 @@ export function WorkoutManagement() {
                   <div className="flex space-x-2">
                     <Input
                       value={newExercise}
-                      onChange={(e) => setNewExercise(e.target.value)}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        setNewExercise(e.target.value);
+                      }}
                       placeholder="New exercise name..."
                       className="flex-1 bg-transparent border-2 border-white/20 hover:border-white/30 focus:border-white focus:ring-0 text-white placeholder:text-white/50 h-9"
                     />
@@ -624,7 +648,10 @@ export function WorkoutManagement() {
                       variant="outline"
                       size="sm"
                       disabled={isLoading || !newExercise.trim()}
-                      onClick={handleAddExercise}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAddExercise();
+                      }}
                       className="border-white/20 bg-white/10 text-white hover:bg-white hover:text-black h-9"
                     >
                       <Plus className="h-3.5 w-3.5 mr-1" />
