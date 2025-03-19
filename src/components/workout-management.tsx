@@ -28,20 +28,48 @@ interface ExerciseInsert {
 
 export function WorkoutManagement() {
   const { selectedDay, currentUser, setCurrentUser } = useWorkout();
-  const [workoutDays, setWorkoutDays] = useState<Day[]>(Object.keys(defaultExercises) as Day[]);
+  // Initialize with default data immediately to prevent UI thrashing
+  const [workoutDays, setWorkoutDays] = useState<Day[]>(
+    currentUser === 'Babli' 
+      ? ['Monday', 'Wednesday', 'Thursday', 'Saturday'] 
+      : ['Monday', 'Wednesday', 'Thursday']
+  );
   const [selectedDayForEdit, setSelectedDayForEdit] = useState<Day>(selectedDay);
   const [workoutExercises, setWorkoutExercises] = useState<ExercisesByDay>(defaultExercises);
   const [newExercise, setNewExercise] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [expanded, setExpanded] = useState<{[key in Day]?: boolean}>({});
+  const [expanded, setExpanded] = useState<{[key in Day]?: boolean}>({
+    [selectedDay]: true // Start with selected day expanded
+  });
   const [availableUsers, setAvailableUsers] = useState<string[]>(['Mottu', 'Babli']);
   const [selectedUser, setSelectedUser] = useState<UserType>(currentUser);
-  const [dataLoading, setDataLoading] = useState(true);
-  const [availableDays, setAvailableDays] = useState<Day[]>([]);
+  const [dataLoading, setDataLoading] = useState(false);
+  const [availableDays, setAvailableDays] = useState<Day[]>(
+    currentUser === 'Babli' 
+      ? ['Monday', 'Wednesday', 'Thursday', 'Saturday'] 
+      : ['Monday', 'Wednesday', 'Thursday']
+  );
   const [newDay, setNewDay] = useState<Day>('Monday');
   const [dayManagementOpen, setDayManagementOpen] = useState(false);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
-  // Fetch available users
+  // Prefetch exercises for both users when component mounts
+  useEffect(() => {
+    const prefetchData = async () => {
+      // Prefetch for current user
+      await fetchUserExercises(currentUser);
+      
+      // If not loaded completely yet, mark as complete
+      if (!initialLoadComplete) {
+        setInitialLoadComplete(true);
+      }
+    };
+    
+    prefetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Fetch available users in background
   useEffect(() => {
     const fetchUsers = async () => {
       const { data, error } = await supabase
@@ -65,78 +93,150 @@ export function WorkoutManagement() {
     fetchUsers();
   }, []);
 
-  // Fetch user-specific exercises
+  // Extract fetchUserExercises to a reusable function
+  const fetchUserExercises = async (user: UserType) => {
+    try {
+      // No timeout needed - we're using optimistic updates
+      
+      // First fetch all exercises for the user from the database
+      const { data, error } = await supabase
+        .from('exercises')
+        .select('*')
+        .eq('username', user)
+        .order('position');
+      
+      if (error) throw error;
+      
+      // If we have exercises for this user in the database, use them
+      if (data && data.length > 0) {
+        // Create a new ExercisesByDay object with the correct structure
+        const userExercises: ExercisesByDay = {
+          Monday: [],
+          Tuesday: [],
+          Wednesday: [],
+          Thursday: [],
+          Friday: [],
+          Saturday: [],
+          Sunday: []
+        };
+        
+        // Fill in exercises from database
+        data.forEach(exercise => {
+          if (userExercises[exercise.day as Day]) {
+            userExercises[exercise.day as Day].push(exercise.name);
+          }
+        });
+        
+        if (user === selectedUser) {
+          setWorkoutExercises(userExercises);
+        }
+        
+        return userExercises;
+      } else {
+        // If no exercises yet for this user, initialize with default exercises
+        if (user === selectedUser) {
+          setWorkoutExercises(defaultExercises);
+        }
+        
+        // Initialize the database with default exercises for this user in background
+        const currentDays = user === 'Babli' 
+          ? ['Monday', 'Wednesday', 'Thursday', 'Saturday'] 
+          : ['Monday', 'Wednesday', 'Thursday'];
+          
+        const exercisesToInsert: ExerciseInsert[] = [];
+        for (const day of currentDays) {
+          const typedDay = day as Day;
+          defaultExercises[typedDay].forEach((exercise: string, position: number) => {
+            exercisesToInsert.push({
+              username: user,
+              day: day,
+              name: exercise,
+              position: position
+            });
+          });
+        }
+        
+        // Only insert if there are exercises to insert
+        if (exercisesToInsert.length > 0) {
+          // Insert all default exercises for this user
+          await supabase
+            .from('exercises')
+            .insert(exercisesToInsert);
+        }
+        
+        return defaultExercises;
+      }
+    } catch (error) {
+      console.error('Error fetching exercises:', error);
+      // Fallback to defaults
+      return defaultExercises;
+    }
+  };
+
+  // Fetch user exercises when user changes - but don't show loading state
   useEffect(() => {
-    const fetchUserExercises = async () => {
-      setDataLoading(true);
+    const loadUserData = async () => {
+      // Only show loading if we haven't completed initial load
+      if (!initialLoadComplete) {
+        setDataLoading(true);
+      }
+      
+      await fetchUserExercises(selectedUser);
+      
+      setDataLoading(false);
+    };
+    
+    loadUserData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedUser, initialLoadComplete]);
+
+  // Fetch available days - optimized to avoid flashing
+  useEffect(() => {
+    const fetchUserDays = async () => {
       try {
-        // First fetch all exercises for the user from the database
+        // No need for loading state or timeout - we're already showing data
         const { data, error } = await supabase
-          .from('exercises')
-          .select('*')
+          .from('user_days')
+          .select('day, day_order')
           .eq('username', selectedUser)
-          .order('position');
+          .order('day_order');
         
         if (error) throw error;
         
-        // If we have exercises for this user in the database, use them
         if (data && data.length > 0) {
-          // Create a new ExercisesByDay object with the correct structure
-          const userExercises: ExercisesByDay = {
-            Monday: [],
-            Tuesday: [],
-            Wednesday: [],
-            Thursday: [],
-            Friday: [],
-            Saturday: [],
-            Sunday: []
-          };
-          
-          // Fill in exercises from database
-          data.forEach(exercise => {
-            if (userExercises[exercise.day as Day]) {
-              userExercises[exercise.day as Day].push(exercise.name);
-            }
-          });
-          
-          setWorkoutExercises(userExercises);
+          // Extract the days and convert to Day type
+          const days = data.map(item => item.day) as Day[];
+          setAvailableDays(days);
+          setWorkoutDays(days);
         } else {
-          // If no exercises yet for this user, initialize with default exercises
-          // In a production app, you might want to copy the defaults to the database
-          setWorkoutExercises(defaultExercises);
-          
-          // Optional: Initialize the database with default exercises for this user
-          const exercisesToInsert: ExerciseInsert[] = [];
-          for (const day of workoutDays) {
-            defaultExercises[day].forEach((exercise, position) => {
-              exercisesToInsert.push({
-                username: selectedUser,
-                day: day,
-                name: exercise,
-                position: position
-              });
-            });
-          }
-          
-          // Only insert if there are exercises to insert
-          if (exercisesToInsert.length > 0) {
-            // Insert all default exercises for this user
-            await supabase
-              .from('exercises')
-              .insert(exercisesToInsert);
-          }
+          // Fallback to default days
+          const defaultDays: Day[] = selectedUser === 'Babli' 
+            ? ['Monday', 'Wednesday', 'Thursday', 'Saturday'] 
+            : ['Monday', 'Wednesday', 'Thursday'];
+          setAvailableDays(defaultDays);
+          setWorkoutDays(defaultDays);
         }
       } catch (error) {
-        console.error('Error fetching exercises:', error);
-        // Fallback to defaults
-        setWorkoutExercises(defaultExercises);
-      } finally {
-        setDataLoading(false);
+        console.error('Error fetching user days:', error);
       }
     };
 
-    fetchUserExercises();
-  }, [selectedUser, workoutDays]);
+    fetchUserDays();
+  }, [selectedUser]);
+
+  // Function to get day order
+  const getDayOrder = (day: Day): number => {
+    const dayOrder: Record<Day, number> = {
+      'Monday': 1,
+      'Tuesday': 2,
+      'Wednesday': 3,
+      'Thursday': 4,
+      'Friday': 5,
+      'Saturday': 6,
+      'Sunday': 7
+    };
+    return dayOrder[day];
+  };
 
   // Initialize expanded state
   useEffect(() => {
@@ -148,10 +248,16 @@ export function WorkoutManagement() {
   }, [selectedDay, workoutDays]);
 
   const toggleExpanded = (day: Day) => {
+    // Stop event propagation to prevent interfering with sidebar
     setExpanded(prev => ({
       ...prev,
       [day]: !prev[day]
     }));
+    
+    // If we're expanding this day, ensure it's the selected day for edit
+    if (!expanded[day]) {
+      setSelectedDayForEdit(day);
+    }
   };
 
   const handleAddExercise = async () => {
@@ -234,53 +340,40 @@ export function WorkoutManagement() {
       const [movedItem] = dayExercises.splice(fromIndex, 1);
       dayExercises.splice(toIndex, 0, movedItem);
       
+      // Update local state immediately for responsive UI
       const updatedExercises = {
         ...workoutExercises,
         [day]: dayExercises
       };
-      
-      // In a production app, you would update the positions in the database
-      // This is a simplified version that just updates local state
-      
-      // Update local state
       setWorkoutExercises(updatedExercises);
       
-      // Update positions in database
-      const fromExercise = workoutExercises[day][fromIndex];
-      const toExercise = workoutExercises[day][toIndex];
+      // First, delete all exercises for this day to avoid conflicts
+      await supabase
+        .from('exercises')
+        .delete()
+        .eq('username', selectedUser)
+        .eq('day', day);
+        
+      // Then insert all exercises with updated positions
+      const exercisesToInsert = dayExercises.map((name, index) => ({
+        username: selectedUser,
+        day: day,
+        name: name,
+        position: index
+      }));
       
-      // Get the IDs of the exercises to update
-      const { data: fromData } = await supabase
+      // Insert all exercises with new positions
+      const { error } = await supabase
         .from('exercises')
-        .select('id')
-        .eq('username', selectedUser)
-        .eq('day', day)
-        .eq('name', fromExercise)
-        .single();
+        .insert(exercisesToInsert);
         
-      const { data: toData } = await supabase
-        .from('exercises')
-        .select('id')
-        .eq('username', selectedUser)
-        .eq('day', day)
-        .eq('name', toExercise)
-        .single();
-        
-      if (fromData && toData) {
-        // Swap positions
-        await supabase
-          .from('exercises')
-          .update({ position: toIndex })
-          .eq('id', fromData.id);
-          
-        await supabase
-          .from('exercises')
-          .update({ position: fromIndex })
-          .eq('id', toData.id);
-      }
+      if (error) throw error;
     } catch (error) {
       console.error('Error moving exercise:', error);
       alert('Failed to move exercise. Please try again.');
+      
+      // Restore original order if there was an error
+      fetchUserExercises(selectedUser);
     } finally {
       setIsLoading(false);
     }
@@ -288,57 +381,16 @@ export function WorkoutManagement() {
 
   // Function to handle user change
   const handleUserChange = (user: UserType) => {
+    // Update selected user immediately for a responsive UI
     setSelectedUser(user);
-    setCurrentUser(user); // Directly update the current user throughout the app
-  };
-
-  // Fetch available days
-  useEffect(() => {
-    const fetchUserDays = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('user_days')
-          .select('day, day_order')
-          .eq('username', selectedUser)
-          .order('day_order');
-        
-        if (error) throw error;
-        
-        if (data && data.length > 0) {
-          // Extract the days and convert to Day type
-          const days = data.map(item => item.day) as Day[];
-          setAvailableDays(days);
-          
-          // Update workoutDays to match available days
-          setWorkoutDays(days);
-        } else {
-          // Fallback to default days as a last resort
-          const defaultDays: Day[] = selectedUser === 'Babli' 
-            ? ['Monday', 'Wednesday', 'Thursday', 'Saturday'] 
-            : ['Monday', 'Wednesday', 'Thursday'];
-          setAvailableDays(defaultDays);
-          setWorkoutDays(defaultDays);
-        }
-      } catch (error) {
-        console.error('Error fetching user days:', error);
-      }
-    };
-
-    fetchUserDays();
-  }, [selectedUser]);
-
-  // Function to get day order
-  const getDayOrder = (day: Day): number => {
-    const dayOrder: Record<Day, number> = {
-      'Monday': 1,
-      'Tuesday': 2,
-      'Wednesday': 3,
-      'Thursday': 4,
-      'Friday': 5,
-      'Saturday': 6,
-      'Sunday': 7
-    };
-    return dayOrder[day];
+    setCurrentUser(user);
+    
+    // Pre-populate with defaults for the selected user immediately
+    const defaultDays: Day[] = user === 'Babli' 
+      ? ['Monday', 'Wednesday', 'Thursday', 'Saturday'] 
+      : ['Monday', 'Wednesday', 'Thursday'];
+    setAvailableDays(defaultDays);
+    setWorkoutDays(defaultDays);
   };
 
   // Add a new day
@@ -431,17 +483,63 @@ export function WorkoutManagement() {
     }
   };
 
-  if (dataLoading) {
+  // Only show skeleton if we've never loaded data and are still loading
+  if (!initialLoadComplete && dataLoading) {
     return (
-      <div className="flex flex-col items-center justify-center h-64 space-y-4">
-        <Loader2 className="h-8 w-8 text-white animate-spin" />
-        <div className="text-white/70">Loading exercises...</div>
+      <div className="space-y-4 p-4" onClick={(e) => e.stopPropagation()}>
+        <h2 className="text-2xl font-bold text-white mb-6">Manage Workouts</h2>
+        
+        {/* User selection - show actual buttons */}
+        <div className="space-y-4">
+          <Label className="text-white/80 text-sm font-medium block">
+            Select User
+          </Label>
+          <div className="flex flex-col space-y-2">
+            <div className="grid grid-cols-2 gap-2">
+              {availableUsers.map((user) => (
+                <Button
+                  key={user}
+                  variant={user === selectedUser ? "default" : "outline"}
+                  onClick={() => handleUserChange(user as UserType)}
+                  className={user === selectedUser 
+                    ? "bg-white text-black" 
+                    : "border-white/20 bg-white/10 text-white hover:bg-white hover:text-black"
+                  }
+                >
+                  <User className="h-4 w-4 mr-2" />
+                  {user}
+                </Button>
+              ))}
+            </div>
+          </div>
+        </div>
+        
+        {/* Days - show as skeletons */}
+        <div className="mt-8 mb-4">
+          <div className="flex justify-between items-center">
+            <h3 className="text-xl font-semibold text-white">Workout Days</h3>
+            <div className="h-8 w-20 bg-white/10 rounded-md animate-pulse"></div>
+          </div>
+        </div>
+        
+        {/* Exercise list skeletons - maintain same structure */}
+        {workoutDays.map((day) => (
+          <div key={day} className="border border-white/10 rounded-md overflow-hidden mb-4">
+            <div className="bg-white/5 p-3 flex justify-between cursor-pointer">
+              <div className="flex items-center">
+                <Calendar className="h-4 w-4 mr-2 opacity-70" />
+                <span className="font-medium text-white">{day}</span>
+              </div>
+              <ChevronDown className="h-4 w-4 text-white" />
+            </div>
+          </div>
+        ))}
       </div>
     );
   }
 
   return (
-    <div className="p-4">
+    <div className="p-4" onClick={(e) => e.stopPropagation()}>
       <h2 className="text-2xl font-bold text-white mb-6">Manage Workouts</h2>
       
       {/* User Selection Section */}

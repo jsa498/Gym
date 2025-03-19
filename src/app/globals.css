@@ -139,3 +139,13 @@
 [data-side="left"].data-[state="closed"]:animate-out {
   transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
+
+/* Custom animation for mobile menu button */
+@keyframes pulse-once {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.85; transform: scale(1.1); }
+}
+
+.animate-pulse-once {
+  animation: pulse-once 1.5s ease-in-out 1;
+}

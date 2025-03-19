@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Day, ExerciseSet, User, exercises } from './types';
+import { Day, ExerciseSet, User, exercises as defaultExercises } from './types';
 import { supabase } from './supabase';
 
 interface WorkoutContextProps {
@@ -21,10 +21,81 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   const [currentUser, setCurrentUser] = useState<User>('Mottu');
   const [selectedDay, setSelectedDay] = useState<Day>('Monday');
   const [exerciseSets, setExerciseSets] = useState<Record<string, ExerciseSet[]>>({});
+  const [exercisesByDay, setExercisesByDay] = useState<Record<Day, string[]>>(defaultExercises as Record<Day, string[]>);
 
-  // Subscribe to real-time changes
+  // Fetch exercises for the current user and day
+  const fetchExercisesForDay = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('exercises')
+        .select('name')
+        .eq('username', currentUser)
+        .eq('day', selectedDay)
+        .order('position');
+        
+      if (error) throw error;
+      
+      if (data && data.length > 0) {
+        // Extract just the exercise names
+        const exerciseNames = data.map(item => item.name);
+        
+        // Update the exercises for the current day
+        setExercisesByDay(prev => ({
+          ...prev,
+          [selectedDay]: exerciseNames
+        }));
+      } else {
+        // If no data, use defaults
+        setExercisesByDay(prev => ({
+          ...prev,
+          [selectedDay]: defaultExercises[selectedDay] || []
+        }));
+      }
+    } catch (error) {
+      console.error('Error fetching exercises:', error);
+      // Fall back to defaults
+      setExercisesByDay(prev => ({
+        ...prev,
+        [selectedDay]: defaultExercises[selectedDay] || []
+      }));
+    }
+  };
+
+  // Subscribe to real-time changes in exercises table
   useEffect(() => {
-    const channel = supabase
+    const exercisesChannel = supabase
+      .channel('exercises_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'exercises'
+        },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (payload: any) => {
+          // Only refresh if the change affects the current user and day
+          const record = payload.new || payload.old;
+          if (record && record.username === currentUser && record.day === selectedDay) {
+            fetchExercisesForDay();
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(exercisesChannel);
+    };
+  }, [currentUser, selectedDay]);
+
+  // Initial fetch of exercises when user or day changes
+  useEffect(() => {
+    fetchExercisesForDay();
+  }, [currentUser, selectedDay]);
+
+  // Subscribe to real-time changes in sets
+  useEffect(() => {
+    const setsChannel = supabase
       .channel('workout_sets_changes')
       .on(
         'postgres_changes',
@@ -35,7 +106,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         },
         async () => {
           // Refresh data when changes occur
-          const dayExercises = exercises[selectedDay] || [];
+          const dayExercises = exercisesByDay[selectedDay] || [];
           const newExerciseSets: Record<string, ExerciseSet[]> = {};
           
           for (const exercise of dayExercises) {
@@ -60,14 +131,14 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(setsChannel);
     };
-  }, [currentUser, selectedDay]);
+  }, [currentUser, selectedDay, exercisesByDay]);
 
   // Initialize or update exerciseSets when user or day changes
   useEffect(() => {
     const fetchSets = async () => {
-      const dayExercises = exercises[selectedDay] || [];
+      const dayExercises = exercisesByDay[selectedDay] || [];
       const newExerciseSets: Record<string, ExerciseSet[]> = {};
       
       for (const exercise of dayExercises) {
@@ -90,7 +161,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     };
 
     fetchSets();
-  }, [currentUser, selectedDay]);
+  }, [currentUser, selectedDay, exercisesByDay]);
 
   const getSetsForExercise = (exerciseName: string) => {
     return exerciseSets[exerciseName] || [];
@@ -145,7 +216,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         getSetsForExercise,
         addSetToExercise,
         removeSetFromExercise,
-        exercisesForSelectedDay: exercises[selectedDay] || [],
+        exercisesForSelectedDay: exercisesByDay[selectedDay] || [],
       }}
     >
       {children}
