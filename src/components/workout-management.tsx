@@ -50,7 +50,15 @@ export function WorkoutManagement() {
         .order('username');
 
       if (!error && data) {
-        setAvailableUsers(data.map(user => user.username));
+        // Sort with Mottu first, then Babli, then any other users alphabetically
+        const sortedUsers = data.map(user => user.username).sort((a, b) => {
+          if (a === 'Mottu') return -1;
+          if (b === 'Mottu') return 1;
+          if (a === 'Babli') return -1;
+          if (b === 'Babli') return 1;
+          return a.localeCompare(b);
+        });
+        setAvailableUsers(sortedUsers);
       }
     };
 
@@ -281,11 +289,7 @@ export function WorkoutManagement() {
   // Function to handle user change
   const handleUserChange = (user: UserType) => {
     setSelectedUser(user);
-  };
-
-  // Apply selected user to app
-  const applyUserSelection = () => {
-    setCurrentUser(selectedUser);
+    setCurrentUser(user); // Directly update the current user throughout the app
   };
 
   // Fetch available days
@@ -294,9 +298,9 @@ export function WorkoutManagement() {
       try {
         const { data, error } = await supabase
           .from('user_days')
-          .select('day')
+          .select('day, day_order')
           .eq('username', selectedUser)
-          .order('day');
+          .order('day_order');
         
         if (error) throw error;
         
@@ -323,24 +327,41 @@ export function WorkoutManagement() {
     fetchUserDays();
   }, [selectedUser]);
 
+  // Function to get day order
+  const getDayOrder = (day: Day): number => {
+    const dayOrder: Record<Day, number> = {
+      'Monday': 1,
+      'Tuesday': 2,
+      'Wednesday': 3,
+      'Thursday': 4,
+      'Friday': 5,
+      'Saturday': 6,
+      'Sunday': 7
+    };
+    return dayOrder[day];
+  };
+
   // Add a new day
   const handleAddDay = async () => {
     if (!newDay || availableDays.includes(newDay)) return;
     
     setIsLoading(true);
     try {
-      // Insert the new day in the database
+      const dayOrder = getDayOrder(newDay);
+      
+      // Insert the new day in the database with order
       const { error } = await supabase
         .from('user_days')
         .insert([{ 
           username: selectedUser, 
-          day: newDay 
+          day: newDay,
+          day_order: dayOrder
         }]);
       
       if (error) throw error;
       
-      // Update local state
-      const updatedDays = [...availableDays, newDay].sort();
+      // Update local state - add new day and sort by order
+      const updatedDays = [...availableDays, newDay].sort((a, b) => getDayOrder(a as Day) - getDayOrder(b as Day));
       setAvailableDays(updatedDays as Day[]);
       setWorkoutDays(updatedDays as Day[]);
       
@@ -445,22 +466,13 @@ export function WorkoutManagement() {
               </Button>
             ))}
           </div>
-          
-          <Button 
-            variant="outline"
-            onClick={applyUserSelection}
-            className="mt-2 border-white/20 bg-white/10 text-white hover:bg-white hover:text-black"
-            disabled={selectedUser === currentUser}
-          >
-            Apply User Selection to App
-          </Button>
         </div>
       </div>
       
-      {/* Day Management Section */}
+      {/* Day Management Section - Modified to be more compact */}
       <div className="mt-8 mb-4">
         <div className="flex justify-between items-center">
-          <h3 className="text-xl font-semibold text-white">Manage Days</h3>
+          <h3 className="text-xl font-semibold text-white">Workout Days</h3>
           <Button 
             variant="outline" 
             size="sm"
@@ -506,6 +518,7 @@ export function WorkoutManagement() {
                   <SelectContent className="bg-black/90 border-white/20">
                     {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
                       .filter(day => !availableDays.includes(day as Day))
+                      .sort((a, b) => getDayOrder(a as Day) - getDayOrder(b as Day))
                       .map(day => (
                         <SelectItem 
                           key={day} 
@@ -533,33 +546,20 @@ export function WorkoutManagement() {
         )}
       </div>
       
-      {/* Day Selection for Edit */}
-      <div className="mt-6 mb-4">
-        <h3 className="text-xl font-semibold text-white mb-4">Select Day to Edit</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-          {workoutDays.map(day => (
-            <Button
-              key={day}
-              variant={selectedDayForEdit === day ? "default" : "outline"}
-              onClick={() => setSelectedDayForEdit(day)}
-              className={selectedDayForEdit === day 
-                ? "bg-white text-black hover:bg-white/90" 
-                : "bg-black/50 text-white hover:bg-white/20"
-              }
-            >
-              {day}
-            </Button>
-          ))}
-        </div>
-      </div>
-      
       {/* Workout Management */}
       <div className="space-y-4">
         {workoutDays.map((day) => (
           <div key={day} className="border border-white/10 rounded-md overflow-hidden">
             <button
-              className="w-full flex items-center justify-between p-3 bg-white/5 hover:bg-white/10 text-white"
-              onClick={() => toggleExpanded(day)}
+              className={`w-full flex items-center justify-between p-3 text-white ${
+                day === selectedDayForEdit 
+                  ? "bg-white/20 hover:bg-white/25" 
+                  : "bg-white/5 hover:bg-white/10"
+              }`}
+              onClick={() => {
+                toggleExpanded(day);
+                setSelectedDayForEdit(day);
+              }}
             >
               <div className="flex items-center">
                 <Calendar className="h-4 w-4 mr-2 opacity-70" />
@@ -611,28 +611,27 @@ export function WorkoutManagement() {
                   ))
                 )}
                 
-                {day === selectedDayForEdit && (
-                  <div className="pt-3 mt-2 border-t border-white/10">
-                    <div className="flex space-x-2">
-                      <Input
-                        value={newExercise}
-                        onChange={(e) => setNewExercise(e.target.value)}
-                        placeholder="New exercise name..."
-                        className="flex-1 bg-transparent border-2 border-white/20 hover:border-white/30 focus:border-white focus:ring-0 text-white placeholder:text-white/50 h-9"
-                      />
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={isLoading || !newExercise.trim()}
-                        onClick={handleAddExercise}
-                        className="border-white/20 bg-white/10 text-white hover:bg-white hover:text-black h-9"
-                      >
-                        <Plus className="h-3.5 w-3.5 mr-1" />
-                        Add
-                      </Button>
-                    </div>
+                {/* Exercise input field appears only for the selected day */}
+                <div className="pt-3 mt-2 border-t border-white/10">
+                  <div className="flex space-x-2">
+                    <Input
+                      value={newExercise}
+                      onChange={(e) => setNewExercise(e.target.value)}
+                      placeholder="New exercise name..."
+                      className="flex-1 bg-transparent border-2 border-white/20 hover:border-white/30 focus:border-white focus:ring-0 text-white placeholder:text-white/50 h-9"
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={isLoading || !newExercise.trim()}
+                      onClick={handleAddExercise}
+                      className="border-white/20 bg-white/10 text-white hover:bg-white hover:text-black h-9"
+                    >
+                      <Plus className="h-3.5 w-3.5 mr-1" />
+                      Add
+                    </Button>
                   </div>
-                )}
+                </div>
               </div>
             )}
           </div>

@@ -72,12 +72,15 @@ export function Sidebar() {
       </Button>
       
       <Sheet open={open} onOpenChange={setOpen}>
-        <SheetContent side="left" className="bg-black/95 text-white border-r border-white/10 p-0">
+        <SheetContent 
+          side="left" 
+          className="bg-black/95 text-white border-r border-white/10 p-0 w-full max-w-full sm:w-[400px] sm:max-w-[80vw] md:max-w-[400px]"
+        >
           {!activeView ? (
             // Menu list view
             <>
               <SheetHeader className="p-6 pb-2">
-                <SheetTitle className="text-xl font-bold">Workout Tracker</SheetTitle>
+                <SheetTitle className="text-xl font-bold text-white">Workout Tracker</SheetTitle>
                 <SheetDescription className="text-white/70">
                   Logged in as {currentUser}
                 </SheetDescription>

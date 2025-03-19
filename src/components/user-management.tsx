@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useWorkout } from '@/lib/workout-context';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,6 +17,29 @@ export function UserManagement() {
   const [editingName, setEditingName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
+  // Fetch users and sort them consistently
+  useEffect(() => {
+    const fetchUsers = async () => {
+      const { data, error } = await supabase
+        .from('users')
+        .select('username');
+
+      if (!error && data) {
+        // Sort with Mottu first, then Babli, then any other users alphabetically
+        const sortedUsers = data.map(user => user.username).sort((a, b) => {
+          if (a === 'Mottu') return -1;
+          if (b === 'Mottu') return 1;
+          if (a === 'Babli') return -1;
+          if (b === 'Babli') return 1;
+          return a.localeCompare(b);
+        });
+        setUsers(sortedUsers);
+      }
+    };
+
+    fetchUsers();
+  }, []);
+
   const handleAddUser = async () => {
     if (!newUser.trim()) return;
     
@@ -29,8 +52,15 @@ export function UserManagement() {
         
       if (error) throw error;
       
-      // Update local state
-      setUsers([...users, newUser.trim()]);
+      // Update local state with proper sorting
+      const updatedUsers = [...users, newUser.trim()].sort((a, b) => {
+        if (a === 'Mottu') return -1;
+        if (b === 'Mottu') return 1;
+        if (a === 'Babli') return -1;
+        if (b === 'Babli') return 1;
+        return a.localeCompare(b);
+      });
+      setUsers(updatedUsers);
       setNewUser('');
     } catch (error) {
       console.error('Error adding user:', error);
@@ -99,10 +129,20 @@ export function UserManagement() {
       
       if (error) throw error;
       
-      // Update local state
-      const newUsers = [...users];
-      newUsers[editingIndex] = newUsername;
-      setUsers(newUsers);
+      // Update local state with proper sorting
+      const updatedUsers = [...users];
+      updatedUsers[editingIndex] = newUsername;
+      
+      // Apply consistent sorting
+      const sortedUsers = updatedUsers.sort((a, b) => {
+        if (a === 'Mottu') return -1;
+        if (b === 'Mottu') return 1;
+        if (a === 'Babli') return -1;
+        if (b === 'Babli') return 1;
+        return a.localeCompare(b);
+      });
+      
+      setUsers(sortedUsers);
       
       // If the current user was renamed, update that too
       if (currentUser === oldUsername) {

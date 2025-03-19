@@ -24,9 +24,9 @@ export function DaySelector() {
       try {
         const { data, error } = await supabase
           .from('user_days')
-          .select('day')
+          .select('day, day_order')
           .eq('username', currentUser)
-          .order('day');
+          .order('day_order');
         
         if (error) throw error;
         
