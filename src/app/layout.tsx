@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import { WorkoutProvider } from '@/lib/workout-context';
 import { Sidebar } from '@/components/sidebar';
+import { ManageUsers } from '@/components/manage-users';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -22,6 +23,7 @@ export default function RootLayout({
         <WorkoutProvider>
           <Sidebar />
           {children}
+          <ManageUsers />
         </WorkoutProvider>
       </body>
     </html>

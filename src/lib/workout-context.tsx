@@ -13,6 +13,7 @@ interface WorkoutContextProps {
   addSetToExercise: (exerciseName: string, set: ExerciseSet) => void;
   removeSetFromExercise: (exerciseName: string, index: number) => void;
   exercisesForSelectedDay: string[];
+  users: User[];
 }
 
 const WorkoutContext = createContext<WorkoutContextProps | undefined>(undefined);
@@ -22,6 +23,59 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   const [selectedDay, setSelectedDay] = useState<Day>('Monday');
   const [exerciseSets, setExerciseSets] = useState<Record<string, ExerciseSet[]>>({});
   const [exercisesByDay, setExercisesByDay] = useState<Record<Day, string[]>>(defaultExercises as Record<Day, string[]>);
+  const [users, setUsers] = useState<User[]>([]);
+
+  // Fetch all users from the database
+  const fetchUsers = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('username, id')
+        .order('id');
+        
+      if (error) throw error;
+      
+      if (data && data.length > 0) {
+        const usernames = data.map(user => user.username);
+        setUsers(usernames);
+        
+        // If current user doesn't exist in the list, set to the first user
+        if (usernames.length > 0 && !usernames.includes(currentUser)) {
+          setCurrentUser(usernames[0]);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching users:', error);
+    }
+  }, [currentUser]);
+
+  // Fetch users on component mount
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
+
+  // Subscribe to real-time changes in the users table
+  useEffect(() => {
+    const usersChannel = supabase
+      .channel('public:users')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'users'
+        },
+        (payload) => {
+          console.log('User change detected:', payload);
+          fetchUsers();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(usersChannel);
+    };
+  }, [fetchUsers]);
 
   // Fetch exercises for the current user and day
   const fetchExercisesForDay = useCallback(async () => {
@@ -217,6 +271,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         addSetToExercise,
         removeSetFromExercise,
         exercisesForSelectedDay: exercisesByDay[selectedDay] || [],
+        users,
       }}
     >
       {children}

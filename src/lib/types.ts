@@ -1,4 +1,4 @@
-export type User = 'Mottu' | 'Babli';
+export type User = string;
 
 export type Day = 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | 'Sunday';
 

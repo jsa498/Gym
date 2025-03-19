@@ -5,9 +5,17 @@ import { useWorkout } from '@/lib/workout-context';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Trash2, Edit, Plus, Save } from 'lucide-react';
+import { Trash2, Edit, Plus, Save, AlertCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { User } from '@/lib/types';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
 
 export function UserManagement() {
   const { currentUser, setCurrentUser } = useWorkout();
@@ -16,6 +24,8 @@ export function UserManagement() {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editingName, setEditingName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [userToDeleteIndex, setUserToDeleteIndex] = useState<number | null>(null);
 
   // Fetch users and sort them consistently
   useEffect(() => {
@@ -70,7 +80,7 @@ export function UserManagement() {
     }
   };
 
-  const handleDeleteUser = async (index: number) => {
+  const openDeleteConfirmation = (index: number) => {
     const userToDelete = users[index];
     
     // Don't allow deleting the current user
@@ -79,7 +89,14 @@ export function UserManagement() {
       return;
     }
     
-    if (!confirm(`Are you sure you want to delete ${userToDelete}?`)) return;
+    setUserToDeleteIndex(index);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteUser = async () => {
+    if (userToDeleteIndex === null) return;
+    
+    const userToDelete = users[userToDeleteIndex];
     
     setIsLoading(true);
     try {
@@ -93,8 +110,12 @@ export function UserManagement() {
       
       // Update local state
       const newUsers = [...users];
-      newUsers.splice(index, 1);
+      newUsers.splice(userToDeleteIndex, 1);
       setUsers(newUsers);
+      
+      // Close the dialog
+      setDeleteDialogOpen(false);
+      setUserToDeleteIndex(null);
     } catch (error) {
       console.error('Error deleting user:', error);
       alert('Failed to delete user. Please try again.');
@@ -159,86 +180,118 @@ export function UserManagement() {
   };
 
   return (
-    <div className="p-4 overflow-visible" onClick={(e) => e.stopPropagation()}>
-      <div className="space-y-6">
-        <h3 className="text-lg font-semibold text-white">Manage Users</h3>
-        
-        <div className="space-y-4">
-          {users.map((user, index) => (
-            <div key={index} className="flex items-center justify-between">
-              {editingIndex === index ? (
-                <div className="flex-1 mr-2">
-                  <Input
-                    value={editingName}
-                    onChange={(e) => setEditingName(e.target.value)}
-                    className="bg-transparent border-2 border-white/20 hover:border-white/30 focus:border-white focus:ring-0 text-white"
-                  />
-                </div>
-              ) : (
-                <div className="flex-1 font-medium text-white">{user}</div>
-              )}
-              
-              <div className="flex space-x-2">
+    <>
+      <div className="p-4 overflow-visible" onClick={(e) => e.stopPropagation()}>
+        <div className="space-y-6">
+          <h3 className="text-lg font-semibold text-white">Manage Users</h3>
+          
+          <div className="space-y-4">
+            {users.map((user, index) => (
+              <div key={index} className="flex items-center justify-between">
                 {editingIndex === index ? (
-                  <Button 
-                    variant="outline" 
-                    size="icon"
-                    disabled={isLoading}
-                    onClick={(e) => { e.stopPropagation(); handleUpdateUser(); }}
-                    className="h-8 w-8 border-white/20 bg-white/10 text-white hover:bg-white hover:text-black"
-                  >
-                    <Save className="h-4 w-4" />
-                  </Button>
+                  <div className="flex-1 mr-2">
+                    <Input
+                      value={editingName}
+                      onChange={(e) => setEditingName(e.target.value)}
+                      className="bg-transparent border-2 border-white/20 hover:border-white/30 focus:border-white focus:ring-0 text-white"
+                    />
+                  </div>
                 ) : (
-                  <Button 
-                    variant="outline" 
-                    size="icon"
-                    disabled={isLoading}
-                    onClick={(e) => { e.stopPropagation(); startEditing(index); }}
-                    className="h-8 w-8 border-white/20 bg-white/10 text-white hover:bg-white hover:text-black"
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Button>
+                  <div className="flex-1 font-medium text-white">{user}</div>
                 )}
                 
-                <Button 
-                  variant="outline"
-                  size="icon"
-                  disabled={isLoading || user === currentUser}
-                  onClick={(e) => { e.stopPropagation(); handleDeleteUser(index); }}
-                  className="h-8 w-8 border-white/20 bg-white/10 text-white hover:bg-destructive hover:text-white"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                <div className="flex space-x-2">
+                  {editingIndex === index ? (
+                    <Button 
+                      variant="outline" 
+                      size="icon"
+                      disabled={isLoading}
+                      onClick={(e) => { e.stopPropagation(); handleUpdateUser(); }}
+                      className="h-8 w-8 border-white/20 bg-white/10 text-white hover:bg-white hover:text-black"
+                    >
+                      <Save className="h-4 w-4" />
+                    </Button>
+                  ) : (
+                    <Button 
+                      variant="outline" 
+                      size="icon"
+                      disabled={isLoading}
+                      onClick={(e) => { e.stopPropagation(); startEditing(index); }}
+                      className="h-8 w-8 border-white/20 bg-white/10 text-white hover:bg-white hover:text-black"
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                  )}
+                  
+                  <Button 
+                    variant="outline"
+                    size="icon"
+                    disabled={isLoading || user === currentUser}
+                    onClick={(e) => { e.stopPropagation(); openDeleteConfirmation(index); }}
+                    className="h-8 w-8 border-white/20 bg-white/10 text-white hover:bg-destructive hover:text-white"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
+            ))}
+          </div>
+          
+          <div className="pt-4 border-t border-white/10">
+            <Label htmlFor="new-user" className="text-white/80 text-sm font-medium mb-2 block">
+              Add New User
+            </Label>
+            <div className="flex space-x-2">
+              <Input
+                id="new-user"
+                value={newUser}
+                onChange={(e) => setNewUser(e.target.value)}
+                placeholder="Enter name..."
+                className="flex-1 bg-transparent border-2 border-white/20 hover:border-white/30 focus:border-white focus:ring-0 text-white placeholder:text-white/50"
+              />
+              <Button 
+                variant="outline"
+                disabled={isLoading || !newUser.trim()}
+                onClick={(e) => { e.stopPropagation(); handleAddUser(); }}
+                className="border-white/20 bg-white/10 text-white hover:bg-white hover:text-black"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add
+              </Button>
             </div>
-          ))}
-        </div>
-        
-        <div className="pt-4 border-t border-white/10">
-          <Label htmlFor="new-user" className="text-white/80 text-sm font-medium mb-2 block">
-            Add New User
-          </Label>
-          <div className="flex space-x-2">
-            <Input
-              id="new-user"
-              value={newUser}
-              onChange={(e) => setNewUser(e.target.value)}
-              placeholder="Enter name..."
-              className="flex-1 bg-transparent border-2 border-white/20 hover:border-white/30 focus:border-white focus:ring-0 text-white placeholder:text-white/50"
-            />
-            <Button 
-              variant="outline"
-              disabled={isLoading || !newUser.trim()}
-              onClick={(e) => { e.stopPropagation(); handleAddUser(); }}
-              className="border-white/20 bg-white/10 text-white hover:bg-white hover:text-black"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add
-            </Button>
           </div>
         </div>
       </div>
-    </div>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-md bg-zinc-900 border-zinc-800">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-white">
+              <AlertCircle className="h-5 w-5 text-red-500" />
+              Confirm Deletion
+            </DialogTitle>
+            <DialogDescription className="text-zinc-400">
+              Are you sure you want to delete {userToDeleteIndex !== null ? users[userToDeleteIndex] : ''}?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-4 flex gap-2 sm:justify-between">
+            <Button 
+              variant="outline" 
+              onClick={() => setDeleteDialogOpen(false)}
+              className="border-zinc-700 hover:bg-zinc-800 hover:text-white"
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleDeleteUser}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 } 

@@ -12,11 +12,19 @@ import {
   ChevronUp, 
   Calendar, 
   User,
-  Loader2
+  Loader2,
+  AlertTriangle
 } from 'lucide-react';
 import { exercises as defaultExercises, Day, ExercisesByDay, User as UserType } from '@/lib/types';
 import { supabase } from '@/lib/supabase';
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
 
 // Type for exercise insert
 interface ExerciseInsert {
@@ -36,7 +44,7 @@ export function WorkoutManagement() {
   );
   const [selectedDayForEdit, setSelectedDayForEdit] = useState<Day>(selectedDay);
   const [workoutExercises, setWorkoutExercises] = useState<ExercisesByDay>(defaultExercises);
-  const [newExercise, setNewExercise] = useState('');
+  const [newExerciseInputs, setNewExerciseInputs] = useState<{[key in Day]?: string}>({});
   const [isLoading, setIsLoading] = useState(false);
   const [expanded, setExpanded] = useState<{[key in Day]?: boolean}>({
     [selectedDay]: true // Start with selected day expanded
@@ -49,9 +57,16 @@ export function WorkoutManagement() {
       ? ['Monday', 'Wednesday', 'Thursday', 'Saturday'] 
       : ['Monday', 'Wednesday', 'Thursday']
   );
-  const [newDay, setNewDay] = useState<Day>('Monday');
+  const [selectedDays, setSelectedDays] = useState<Day[]>([]);
   const [dayManagementOpen, setDayManagementOpen] = useState(false);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
+  
+  // Dialog states
+  const [removeExerciseDialogOpen, setRemoveExerciseDialogOpen] = useState(false);
+  const [exerciseToRemove, setExerciseToRemove] = useState<{day: Day, index: number, name: string} | null>(null);
+  const [removeDayDialogOpen, setRemoveDayDialogOpen] = useState(false);
+  const [dayToRemove, setDayToRemove] = useState<Day | null>(null);
+  const [addDayDialogOpen, setAddDayDialogOpen] = useState(false);
 
   // Prefetch exercises for both users when component mounts
   useEffect(() => {
@@ -260,15 +275,16 @@ export function WorkoutManagement() {
     }
   };
 
-  const handleAddExercise = async () => {
-    if (!newExercise.trim()) return;
+  const handleAddExercise = async (day: Day) => {
+    const exerciseValue = newExerciseInputs[day] || '';
+    if (!exerciseValue.trim()) return;
     
     setIsLoading(true);
     try {
       // Create a new array with the added exercise
       const updatedExercises = {
         ...workoutExercises,
-        [selectedDayForEdit]: [...workoutExercises[selectedDayForEdit], newExercise.trim()]
+        [day]: [...workoutExercises[day], exerciseValue.trim()]
       };
       
       // Update in database
@@ -276,16 +292,21 @@ export function WorkoutManagement() {
         .from('exercises')
         .insert([{
           username: selectedUser,
-          day: selectedDayForEdit,
-          name: newExercise.trim(),
-          position: workoutExercises[selectedDayForEdit].length
+          day: day,
+          name: exerciseValue.trim(),
+          position: workoutExercises[day].length
         }]);
       
       if (error) throw error;
       
       // Update local state
       setWorkoutExercises(updatedExercises);
-      setNewExercise('');
+      
+      // Clear only the input for this specific day
+      setNewExerciseInputs(prev => ({
+        ...prev,
+        [day]: ''
+      }));
     } catch (error) {
       console.error('Error adding exercise:', error);
       alert('Failed to add exercise. Please try again.');
@@ -294,10 +315,16 @@ export function WorkoutManagement() {
     }
   };
 
-  const handleRemoveExercise = async (day: Day, index: number) => {
-    const exerciseToRemove = workoutExercises[day][index];
+  const openRemoveExerciseDialog = (day: Day, index: number) => {
+    const exerciseName = workoutExercises[day][index];
+    setExerciseToRemove({day, index, name: exerciseName});
+    setRemoveExerciseDialogOpen(true);
+  };
+
+  const handleRemoveExercise = async () => {
+    if (!exerciseToRemove) return;
     
-    if (!confirm(`Are you sure you want to remove "${exerciseToRemove}"?`)) return;
+    const {day, index, name} = exerciseToRemove;
     
     setIsLoading(true);
     try {
@@ -316,12 +343,16 @@ export function WorkoutManagement() {
         .delete()
         .eq('username', selectedUser)
         .eq('day', day)
-        .eq('name', exerciseToRemove);
+        .eq('name', name);
       
       if (error) throw error;
       
       // Update local state
       setWorkoutExercises(updatedExercises);
+      
+      // Close dialog
+      setRemoveExerciseDialogOpen(false);
+      setExerciseToRemove(null);
     } catch (error) {
       console.error('Error removing exercise:', error);
       alert('Failed to remove exercise. Please try again.');
@@ -385,6 +416,9 @@ export function WorkoutManagement() {
     setSelectedUser(user);
     setCurrentUser(user);
     
+    // Clear all exercise inputs when switching users
+    setNewExerciseInputs({});
+    
     // Pre-populate with defaults for the selected user immediately
     const defaultDays: Day[] = user === 'Babli' 
       ? ['Monday', 'Wednesday', 'Thursday', 'Saturday'] 
@@ -395,50 +429,98 @@ export function WorkoutManagement() {
 
   // Add a new day
   const handleAddDay = async () => {
-    if (!newDay || availableDays.includes(newDay)) return;
+    if (!selectedDays.length) return;
     
     setIsLoading(true);
     try {
-      const dayOrder = getDayOrder(newDay);
+      // Create array of day objects to insert
+      const daysToInsert = selectedDays
+        .filter(day => !availableDays.includes(day))
+        .map(day => ({ 
+          username: selectedUser, 
+          day: day,
+          day_order: getDayOrder(day)
+        }));
       
-      // Insert the new day in the database with order
+      if (daysToInsert.length === 0) {
+        setAddDayDialogOpen(false);
+        return;
+      }
+      
+      // Insert the new days in the database with order
       const { error } = await supabase
         .from('user_days')
-        .insert([{ 
-          username: selectedUser, 
-          day: newDay,
-          day_order: dayOrder
-        }]);
+        .insert(daysToInsert);
       
       if (error) throw error;
       
-      // Update local state - add new day and sort by order
-      const updatedDays = [...availableDays, newDay].sort((a, b) => getDayOrder(a as Day) - getDayOrder(b as Day));
+      // Update local state - add new days and sort by order
+      const updatedDays = [...availableDays, ...selectedDays.filter(day => !availableDays.includes(day))]
+        .sort((a, b) => getDayOrder(a as Day) - getDayOrder(b as Day));
+      
       setAvailableDays(updatedDays as Day[]);
       setWorkoutDays(updatedDays as Day[]);
       
-      // Initialize exercises for the new day if needed
-      if (!workoutExercises[newDay] || workoutExercises[newDay].length === 0) {
-        const updatedExercises = {
-          ...workoutExercises,
-          [newDay]: [] 
-        };
-        setWorkoutExercises(updatedExercises);
-      }
+      // Initialize input state for new days
+      const newInputs = {...newExerciseInputs};
+      selectedDays.forEach(day => {
+        if (!availableDays.includes(day)) {
+          newInputs[day] = '';
+        }
+      });
+      setNewExerciseInputs(newInputs);
       
-      // Close the day management panel
-      setDayManagementOpen(false);
+      // Initialize exercises for the new days if needed
+      const updatedExercises = {...workoutExercises};
+      selectedDays.forEach(day => {
+        if (!availableDays.includes(day) && (!updatedExercises[day] || updatedExercises[day].length === 0)) {
+          updatedExercises[day] = [];
+        }
+      });
+      setWorkoutExercises(updatedExercises);
+      
+      // Clear selected days and close the dialog
+      setSelectedDays([]);
+      setAddDayDialogOpen(false);
     } catch (error) {
-      console.error('Error adding day:', error);
-      alert('Failed to add day. Please try again.');
-    } finally {
-      setIsLoading(false);
+      console.error('Error adding days:', error);
+      alert('Failed to add days. Please try again.');
     }
+    setIsLoading(false);
   };
 
-  // Remove a day
-  const handleRemoveDay = async (day: Day) => {
-    if (!confirm(`Are you sure you want to remove "${day}"? This will delete all exercises for this day.`)) return;
+  useEffect(() => {
+    // Initialize with the first available day when opening dialog
+    if (addDayDialogOpen) {
+      const availableDaysToAdd = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+        .filter(day => !availableDays.includes(day as Day)) as Day[];
+      
+      if (availableDaysToAdd.length > 0) {
+        setSelectedDays([availableDaysToAdd[0]]);
+      } else {
+        setSelectedDays([]);
+      }
+    }
+  }, [addDayDialogOpen, availableDays]);
+
+  // Toggle day selection
+  const toggleDaySelection = (day: Day) => {
+    setSelectedDays(prev => {
+      if (prev.includes(day)) {
+        return prev.filter(d => d !== day);
+      } else {
+        return [...prev, day];
+      }
+    });
+  };
+
+  const openRemoveDayDialog = (day: Day) => {
+    setDayToRemove(day);
+    setRemoveDayDialogOpen(true);
+  };
+
+  const handleRemoveDay = async () => {
+    if (!dayToRemove) return;
     
     setIsLoading(true);
     try {
@@ -447,34 +529,39 @@ export function WorkoutManagement() {
         .from('user_days')
         .delete()
         .eq('username', selectedUser)
-        .eq('day', day);
+        .eq('day', dayToRemove);
       
       if (dayError) throw dayError;
       
-      // Delete any exercises for this day
+      // Delete all exercises for this day
       const { error: exerciseError } = await supabase
         .from('exercises')
         .delete()
         .eq('username', selectedUser)
-        .eq('day', day);
+        .eq('day', dayToRemove);
       
       if (exerciseError) throw exerciseError;
       
       // Update local state
-      const updatedDays = availableDays.filter(d => d !== day);
+      const updatedDays = availableDays.filter(d => d !== dayToRemove);
       setAvailableDays(updatedDays);
       setWorkoutDays(updatedDays);
       
-      // Create a new object without the specified day
-      const remainingExercises = Object.fromEntries(
-        Object.entries(workoutExercises).filter(([key]) => key !== day)
-      ) as ExercisesByDay;
-      setWorkoutExercises(remainingExercises);
+      // Remove exercises for that day from local state
+      const updatedExercises = { ...workoutExercises };
+      delete updatedExercises[dayToRemove];
+      setWorkoutExercises(updatedExercises);
       
-      // If the selected day for edit is removed, change to the first available day
-      if (selectedDayForEdit === day && updatedDays.length > 0) {
-        setSelectedDayForEdit(updatedDays[0]);
-      }
+      // Remove input state for the deleted day
+      setNewExerciseInputs(prev => {
+        const updated = { ...prev };
+        delete updated[dayToRemove];
+        return updated;
+      });
+      
+      // Close dialog
+      setRemoveDayDialogOpen(false);
+      setDayToRemove(null);
     } catch (error) {
       console.error('Error removing day:', error);
       alert('Failed to remove day. Please try again.');
@@ -539,229 +626,325 @@ export function WorkoutManagement() {
   }
 
   return (
-    <div className="p-4 overflow-visible" onClick={(e) => e.stopPropagation()}>
-      <h2 className="text-2xl font-bold text-white mb-6">Manage Workouts</h2>
-      
-      {/* User Selection Section */}
-      <div className="space-y-4">
-        <Label className="text-white/80 text-sm font-medium block">
-          Select User
-        </Label>
-        <div className="flex flex-col space-y-2">
-          <div className="grid grid-cols-2 gap-2">
-            {availableUsers.map((user) => (
-              <Button
-                key={user}
-                variant={user === selectedUser ? "default" : "outline"}
-                onClick={() => handleUserChange(user as UserType)}
-                className={user === selectedUser 
-                  ? "bg-white text-black" 
-                  : "border-white/20 bg-white/10 text-white hover:bg-white hover:text-black"
-                }
-              >
-                <User className="h-4 w-4 mr-2" />
-                {user}
-              </Button>
-            ))}
+    <>
+      <div className="space-y-6 p-4 overflow-visible" onClick={(e) => e.stopPropagation()}>
+        <h2 className="text-2xl font-bold text-white mb-6">Manage Workouts</h2>
+        
+        {/* User Selection Section */}
+        <div className="space-y-4">
+          <Label className="text-white/80 text-sm font-medium block">
+            Select User
+          </Label>
+          <div className="flex flex-col space-y-2">
+            <div className="grid grid-cols-2 gap-2">
+              {availableUsers.map((user) => (
+                <Button
+                  key={user}
+                  variant={user === selectedUser ? "default" : "outline"}
+                  onClick={() => handleUserChange(user as UserType)}
+                  className={user === selectedUser 
+                    ? "bg-white text-black" 
+                    : "border-white/20 bg-white/10 text-white hover:bg-white hover:text-black"
+                  }
+                >
+                  <User className="h-4 w-4 mr-2" />
+                  {user}
+                </Button>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
-      
-      {/* Day Management Section - Modified to be more compact */}
-      <div className="mt-8 mb-4">
-        <div className="flex justify-between items-center">
-          <h3 className="text-xl font-semibold text-white">Workout Days</h3>
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              setDayManagementOpen(!dayManagementOpen);
-            }}
-            className="bg-black/50 text-white hover:bg-white/20"
-          >
-            {dayManagementOpen ? 'Close' : 'Edit Days'}
-          </Button>
-        </div>
         
-        {dayManagementOpen && (
-          <div className="mt-4 p-4 border border-white/20 rounded-lg bg-black/50 backdrop-blur-sm">
-            <div className="mb-4">
-              <h4 className="text-white font-medium mb-2">Current Workout Days</h4>
-              <div className="flex flex-wrap gap-2">
-                {availableDays.map(day => (
-                  <div key={day} className="flex items-center bg-white/10 rounded px-3 py-1">
-                    <span className="text-white mr-2">{day}</span>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleRemoveDay(day);
-                      }}
-                      className="h-6 w-6 p-0 text-white/70 hover:text-white hover:bg-red-500/20"
-                      disabled={availableDays.length <= 1 || isLoading}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
+        {/* Day Management Section - Modified to be more compact */}
+        <div className="mt-8 mb-4">
+          <div className="flex justify-between items-center">
+            <h3 className="text-xl font-semibold text-white">Workout Days</h3>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                setDayManagementOpen(!dayManagementOpen);
+              }}
+              className="bg-black/50 text-white hover:bg-white/20"
+            >
+              {dayManagementOpen ? 'Close' : 'Edit Days'}
+            </Button>
+          </div>
+          
+          {dayManagementOpen && (
+            <div className="mt-4 p-4 border border-white/20 rounded-lg bg-black/50 backdrop-blur-sm">
+              <div className="mb-4">
+                <h4 className="text-white font-medium mb-2">Current Workout Days</h4>
+                <div className="flex flex-wrap gap-2">
+                  {availableDays.map(day => (
+                    <div key={day} className="flex items-center bg-white/10 rounded px-3 py-1">
+                      <span className="text-white mr-2">{day}</span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openRemoveDayDialog(day);
+                        }}
+                        className="h-6 w-6 p-0 text-white/70 hover:text-white hover:bg-red-500/20"
+                        disabled={availableDays.length <= 1 || isLoading}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-            
-            <div className="flex gap-2 items-end">
-              <div className="flex-1">
-                <Label htmlFor="newDay" className="text-white">Add New Day</Label>
-                <Select 
-                  value={newDay} 
-                  onValueChange={(value) => {
-                    setNewDay(value as Day);
-                  }}
-                >
-                  <SelectTrigger id="newDay" className="bg-black/50 border-white/20 text-white">
-                    <SelectValue placeholder="Select a day" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-black/90 border-white/20">
-                    {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-                      .filter(day => !availableDays.includes(day as Day))
-                      .sort((a, b) => getDayOrder(a as Day) - getDayOrder(b as Day))
-                      .map(day => (
-                        <SelectItem 
-                          key={day} 
-                          value={day}
-                          className="text-white hover:bg-white/20"
-                        >
-                          {day}
-                        </SelectItem>
-                      ))
-                    }
-                  </SelectContent>
-                </Select>
-              </div>
+              
               <Button 
                 variant="default" 
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleAddDay();
+                  setAddDayDialogOpen(true);
                 }}
-                disabled={availableDays.includes(newDay) || isLoading}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
+                className="bg-white hover:bg-white/90 text-black"
               >
-                {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4 mr-1" />} 
-                Add Day
+                <Plus className="h-4 w-4 mr-1" /> Add Day
               </Button>
             </div>
-          </div>
-        )}
-      </div>
-      
-      {/* Workout Management */}
-      <div className="space-y-4">
-        {workoutDays.map((day) => (
-          <div key={day} className="border border-white/10 rounded-md overflow-hidden">
-            <button
-              className={`w-full flex items-center justify-between p-3 text-white ${
-                day === selectedDayForEdit 
-                  ? "bg-white/20 hover:bg-white/25" 
-                  : "bg-white/5 hover:bg-white/10"
-              }`}
-              onClick={(e) => {
-                e.stopPropagation();
-                toggleExpanded(day);
-                setSelectedDayForEdit(day);
-              }}
-            >
-              <div className="flex items-center">
-                <Calendar className="h-4 w-4 mr-2 opacity-70" />
-                <span className="font-medium">{day}</span>
-              </div>
-              {expanded[day] ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-            </button>
-            
-            {expanded[day] && (
-              <div className="p-3 space-y-2">
-                {workoutExercises[day].length === 0 ? (
-                  <div className="text-white/50 text-sm italic text-center py-2">
-                    No exercises for this day
-                  </div>
-                ) : (
-                  workoutExercises[day].map((exercise, index) => (
-                    <div key={index} className="flex items-center justify-between py-1">
-                      <div className="flex-1 text-white">{exercise}</div>
-                      <div className="flex space-x-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          disabled={isLoading || index === 0}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            moveExercise(day, index, index - 1);
-                          }}
-                          className="h-7 w-7 text-white/70 hover:text-white hover:bg-white/10"
-                        >
-                          <ChevronUp className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          disabled={isLoading || index === workoutExercises[day].length - 1}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            moveExercise(day, index, index + 1);
-                          }}
-                          className="h-7 w-7 text-white/70 hover:text-white hover:bg-white/10"
-                        >
-                          <ChevronDown className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          disabled={isLoading}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleRemoveExercise(day, index);
-                          }}
-                          className="h-7 w-7 text-white/70 hover:text-red-500 hover:bg-white/10"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+          )}
+        </div>
+        
+        {/* Workout Management */}
+        <div className="space-y-4">
+          {workoutDays.map((day) => (
+            <div key={day} className="border border-white/10 rounded-md overflow-hidden">
+              <button
+                className={`w-full flex items-center justify-between p-3 text-white ${
+                  day === selectedDayForEdit 
+                    ? "bg-white/20 hover:bg-white/25" 
+                    : "bg-white/5 hover:bg-white/10"
+                }`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleExpanded(day);
+                  setSelectedDayForEdit(day);
+                }}
+              >
+                <div className="flex items-center">
+                  <Calendar className="h-4 w-4 mr-2 opacity-70" />
+                  <span className="font-medium">{day}</span>
+                </div>
+                {expanded[day] ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              </button>
+              
+              {expanded[day] && (
+                <div className="p-3 space-y-2">
+                  {workoutExercises[day].length === 0 ? (
+                    <div className="text-white/50 text-sm italic text-center py-2">
+                      No exercises for this day
                     </div>
-                  ))
-                )}
-                
-                {/* Exercise input field appears only for the selected day */}
-                <div className="pt-3 mt-2 border-t border-white/10">
-                  <div className="flex space-x-2">
-                    <Input
-                      value={newExercise}
-                      onChange={(e) => {
-                        e.stopPropagation();
-                        setNewExercise(e.target.value);
-                      }}
-                      placeholder="New exercise name..."
-                      className="flex-1 bg-transparent border-2 border-white/20 hover:border-white/30 focus:border-white focus:ring-0 text-white placeholder:text-white/50 h-9"
-                    />
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={isLoading || !newExercise.trim()}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleAddExercise();
-                      }}
-                      className="border-white/20 bg-white/10 text-white hover:bg-white hover:text-black h-9"
-                    >
-                      <Plus className="h-3.5 w-3.5 mr-1" />
-                      Add
-                    </Button>
+                  ) : (
+                    workoutExercises[day].map((exercise, index) => (
+                      <div key={index} className="flex items-center justify-between py-1">
+                        <div className="flex-1 text-white">{exercise}</div>
+                        <div className="flex space-x-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            disabled={isLoading || index === 0}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              moveExercise(day, index, index - 1);
+                            }}
+                            className="h-7 w-7 text-white/70 hover:text-white hover:bg-white/10"
+                          >
+                            <ChevronUp className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            disabled={isLoading || index === workoutExercises[day].length - 1}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              moveExercise(day, index, index + 1);
+                            }}
+                            className="h-7 w-7 text-white/70 hover:text-white hover:bg-white/10"
+                          >
+                            <ChevronDown className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            disabled={isLoading}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openRemoveExerciseDialog(day, index);
+                            }}
+                            className="h-7 w-7 text-white/70 hover:text-red-500 hover:bg-white/10"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                  
+                  {/* Exercise input field appears only for the selected day */}
+                  <div className="pt-3 mt-2 border-t border-white/10">
+                    <div className="flex space-x-2">
+                      <Input
+                        value={newExerciseInputs[day] || ''}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          setNewExerciseInputs(prev => ({
+                            ...prev,
+                            [day]: e.target.value
+                          }));
+                        }}
+                        placeholder="New exercise name..."
+                        className="flex-1 bg-transparent border-2 border-white/20 hover:border-white/30 focus:border-white focus:ring-0 text-white placeholder:text-white/50 h-9"
+                      />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={isLoading || !newExerciseInputs[day]?.trim()}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleAddExercise(day as Day);
+                        }}
+                        className="border-white/20 bg-white/10 text-white hover:bg-white/90 hover:text-black h-9"
+                      >
+                        <Plus className="h-3.5 w-3.5 mr-1" />
+                        Add
+                      </Button>
+                    </div>
                   </div>
                 </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Dialogs */}
+      <Dialog open={removeExerciseDialogOpen} onOpenChange={setRemoveExerciseDialogOpen}>
+        <DialogContent className="bg-black/95 border-white/20 text-white">
+          <DialogHeader>
+            <DialogTitle>
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-yellow-500" />
+                Remove Exercise
+              </div>
+            </DialogTitle>
+            <DialogDescription className="text-white/70">
+              Are you sure you want to remove &quot;{exerciseToRemove?.name}&quot; from {exerciseToRemove?.day}?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button 
+              variant="ghost"
+              onClick={() => setRemoveExerciseDialogOpen(false)}
+              className="text-white hover:text-white hover:bg-white/20"
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive"
+              onClick={handleRemoveExercise}
+              disabled={isLoading}
+              className="bg-black border border-white/50 hover:bg-white/90 hover:text-black text-white"
+            >
+              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Remove"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={removeDayDialogOpen} onOpenChange={setRemoveDayDialogOpen}>
+        <DialogContent className="bg-black/95 border-white/20 text-white">
+          <DialogHeader>
+            <DialogTitle>
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-red-500" />
+                Remove Workout Day
+              </div>
+            </DialogTitle>
+            <DialogDescription className="text-white/70">
+              Are you sure you want to remove {dayToRemove} from your workout schedule?
+              This will also remove all exercises for this day.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button 
+              variant="ghost" 
+              onClick={() => setRemoveDayDialogOpen(false)}
+              className="text-white hover:text-white hover:bg-white/20"
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={handleRemoveDay}
+              disabled={isLoading}
+              className="bg-black border border-white/50 hover:bg-white/90 hover:text-black text-white"
+            >
+              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Remove"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={addDayDialogOpen} onOpenChange={setAddDayDialogOpen}>
+        <DialogContent className="bg-black/95 border-white/20 text-white">
+          <DialogHeader>
+            <DialogTitle>Add Workout Days</DialogTitle>
+            <DialogDescription className="text-white/70">
+              Select the days you want to add to your workout schedule.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="space-y-2 max-h-48 overflow-y-auto">
+              {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+                .filter(day => !availableDays.includes(day as Day))
+                .sort((a, b) => getDayOrder(a as Day) - getDayOrder(b as Day))
+                .map(day => (
+                  <Button 
+                    key={day} 
+                    variant={selectedDays.includes(day as Day) ? "default" : "outline"}
+                    onClick={() => toggleDaySelection(day as Day)}
+                    className={`w-full justify-start ${
+                      selectedDays.includes(day as Day) 
+                        ? "bg-white text-black hover:bg-white/90"
+                        : "bg-black/50 border-white/20 text-white hover:bg-white/20 hover:text-white"
+                    }`}
+                  >
+                    {day}
+                  </Button>
+                ))}
+            </div>
+            {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+              .filter(day => !availableDays.includes(day as Day)).length === 0 && (
+              <div className="text-white/70 text-center py-2">
+                All days are already added to your schedule
               </div>
             )}
           </div>
-        ))}
-      </div>
-    </div>
+          <DialogFooter>
+            <Button 
+              variant="ghost" 
+              onClick={() => setAddDayDialogOpen(false)}
+              className="text-white hover:text-white hover:bg-white/20"
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="default" 
+              onClick={handleAddDay}
+              disabled={isLoading || selectedDays.length === 0}
+              className="bg-white hover:bg-white/90 text-black"
+            >
+              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : `Add ${selectedDays.length > 0 ? selectedDays.length : ''} Day${selectedDays.length !== 1 ? 's' : ''}`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 } 
