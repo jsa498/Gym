@@ -1,16 +1,10 @@
 'use client';
 
+import { useState } from 'react';
 import { useWorkout } from '@/lib/workout-context';
-import { Button } from './ui/button';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from './ui/table';
-import { WorkoutHistory } from './workout-history';
+import { useAuth } from '@/lib/auth-context';
+import { LoginPrompt } from './login-prompt';
+import { Button } from '@/components/ui/button';
 import { Trash2 } from 'lucide-react';
 
 interface SetListProps {
@@ -18,55 +12,63 @@ interface SetListProps {
 }
 
 export function SetList({ exerciseName }: SetListProps) {
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false);
   const { getSetsForExercise, removeSetFromExercise } = useWorkout();
+  const { user } = useAuth();
   const sets = getSetsForExercise(exerciseName);
 
+  const handleDelete = (index: number) => {
+    if (!user) {
+      setShowLoginPrompt(true);
+      return;
+    }
+
+    removeSetFromExercise(exerciseName, index);
+  };
+
   if (sets.length === 0) {
-    return null;
+    return (
+      <div className="text-center text-white/50 py-8">
+        No sets logged yet
+      </div>
+    );
   }
 
-  // Get only the last set
-  const lastSet = sets[sets.length - 1];
-
   return (
-    <div className="mt-10">
-      <div className="flex items-center mb-4">
-        <h3 className="text-xl font-medium text-white/80">Last Set</h3>
-        <WorkoutHistory exerciseName={exerciseName} />
+    <>
+      <div className="mt-6 space-y-4">
+        <div className="grid grid-cols-5 gap-4 text-sm font-medium text-white/70 pb-2 border-b border-white/10">
+          <div>Warmup</div>
+          <div>Weight</div>
+          <div>Reps</div>
+          <div>Goal</div>
+          <div className="text-right">Actions</div>
+        </div>
+        {sets.map((set, index) => (
+          <div key={index} className="grid grid-cols-5 gap-4 items-center py-2">
+            <div className="text-white">{set.warmup}</div>
+            <div className="text-white">{set.weight}</div>
+            <div className="text-white">{set.reps}</div>
+            <div className="text-white">{set.goal}</div>
+            <div className="text-right">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => handleDelete(index)}
+                className="h-8 w-8 text-white/70 hover:text-white hover:bg-white/10"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        ))}
       </div>
-      <div className="border-2 border-white/20 rounded-xl overflow-hidden bg-black/30 backdrop-blur-sm shadow-inner shadow-white/5">
-        <Table>
-          <TableHeader>
-            <TableRow className="border-b-2 border-white/20 hover:bg-transparent">
-              <TableHead className="text-white/70 font-medium text-sm">Warmup</TableHead>
-              <TableHead className="text-white/70 font-medium text-sm">Weight (lbs)</TableHead>
-              <TableHead className="text-white/70 font-medium text-sm">Reps</TableHead>
-              <TableHead className="text-white/70 font-medium text-sm">Goal</TableHead>
-              <TableHead className="text-white/70 font-medium text-sm w-[80px]">Action</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            <TableRow 
-              className="border-b border-white/10 last:border-0 hover:bg-white/5"
-            >
-              <TableCell className="font-medium">{lastSet.warmup}</TableCell>
-              <TableCell>{lastSet.weight}</TableCell>
-              <TableCell>{lastSet.reps}</TableCell>
-              <TableCell>{lastSet.goal}</TableCell>
-              <TableCell>
-                <Button 
-                  variant="outline"
-                  size="sm"
-                  onClick={() => removeSetFromExercise(exerciseName, sets.length - 1)}
-                  className="border-white/20 bg-white/10 text-white hover:bg-white hover:text-black transition-colors p-2 h-8 w-8"
-                >
-                  <Trash2 size={16} />
-                </Button>
-              </TableCell>
-            </TableRow>
-          </TableBody>
-        </Table>
-      </div>
-    </div>
+
+      <LoginPrompt
+        isOpen={showLoginPrompt}
+        onClose={() => setShowLoginPrompt(false)}
+        message="Please sign in to delete workout sets"
+      />
+    </>
   );
 } 

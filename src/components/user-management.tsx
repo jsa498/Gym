@@ -16,58 +16,88 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
+import { useAuth } from '@/lib/auth-context';
+import { LoginPrompt } from './login-prompt';
 
 export function UserManagement() {
   const { currentUser, setCurrentUser } = useWorkout();
-  const [users, setUsers] = useState<string[]>(['Mottu', 'Babli']);
+  const [users, setUsers] = useState<string[]>(['Name 1', 'Name 2']);
   const [newUser, setNewUser] = useState('');
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editingName, setEditingName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [userToDeleteIndex, setUserToDeleteIndex] = useState<number | null>(null);
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+  const [loginAction, setLoginAction] = useState<'add' | 'edit' | 'delete'>('add');
+  const { user: authUser } = useAuth();
 
   // Fetch users and sort them consistently
   useEffect(() => {
     const fetchUsers = async () => {
+      // If not authenticated, use default users
+      if (!authUser) {
+        setUsers(['Name 1', 'Name 2']);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('users')
-        .select('username');
+        .select('username')
+        .eq('auth_id', authUser.id);
 
       if (!error && data) {
-        // Sort with Mottu first, then Babli, then any other users alphabetically
-        const sortedUsers = data.map(user => user.username).sort((a, b) => {
-          if (a === 'Mottu') return -1;
-          if (b === 'Mottu') return 1;
-          if (a === 'Babli') return -1;
-          if (b === 'Babli') return 1;
-          return a.localeCompare(b);
-        });
-        setUsers(sortedUsers);
+        const usernames = data.map(user => user.username);
+        
+        // Also get buddy name if exists
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('buddy_name, has_buddy')
+          .eq('id', authUser.id)
+          .single();
+          
+        if (profileData && profileData.has_buddy && profileData.buddy_name) {
+          if (!usernames.includes(profileData.buddy_name)) {
+            usernames.push(profileData.buddy_name);
+          }
+        }
+        
+        // Sort alphabetically
+        setUsers(usernames.sort((a, b) => a.localeCompare(b)));
       }
     };
 
     fetchUsers();
-  }, []);
+  }, [authUser]);
 
   const handleAddUser = async () => {
     if (!newUser.trim()) return;
+    
+    // Check if user is logged in
+    if (!authUser) {
+      setLoginAction('add');
+      setShowLoginPrompt(true);
+      return;
+    }
     
     setIsLoading(true);
     try {
       // Add user to Supabase
       const { error } = await supabase
         .from('users')
-        .insert([{ username: newUser.trim() }]);
+        .insert([{ 
+          username: newUser.trim(),
+          auth_id: authUser.id
+        }]);
         
       if (error) throw error;
       
       // Update local state with proper sorting
       const updatedUsers = [...users, newUser.trim()].sort((a, b) => {
-        if (a === 'Mottu') return -1;
-        if (b === 'Mottu') return 1;
-        if (a === 'Babli') return -1;
-        if (b === 'Babli') return 1;
+        if (a === 'Name 1') return -1;
+        if (b === 'Name 1') return 1;
+        if (a === 'Name 2') return -1;
+        if (b === 'Name 2') return 1;
         return a.localeCompare(b);
       });
       setUsers(updatedUsers);
@@ -82,6 +112,13 @@ export function UserManagement() {
 
   const openDeleteConfirmation = (index: number) => {
     const userToDelete = users[index];
+    
+    // Check if user is logged in
+    if (!authUser) {
+      setLoginAction('delete');
+      setShowLoginPrompt(true);
+      return;
+    }
     
     // Don't allow deleting the current user
     if (userToDelete === currentUser) {
@@ -125,6 +162,13 @@ export function UserManagement() {
   };
 
   const startEditing = (index: number) => {
+    // Check if user is logged in
+    if (!authUser) {
+      setLoginAction('edit');
+      setShowLoginPrompt(true);
+      return;
+    }
+    
     setEditingIndex(index);
     setEditingName(users[index]);
   };
@@ -156,10 +200,10 @@ export function UserManagement() {
       
       // Apply consistent sorting
       const sortedUsers = updatedUsers.sort((a, b) => {
-        if (a === 'Mottu') return -1;
-        if (b === 'Mottu') return 1;
-        if (a === 'Babli') return -1;
-        if (b === 'Babli') return 1;
+        if (a === 'Name 1') return -1;
+        if (b === 'Name 1') return 1;
+        if (a === 'Name 2') return -1;
+        if (b === 'Name 2') return 1;
         return a.localeCompare(b);
       });
       
@@ -292,6 +336,19 @@ export function UserManagement() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Login Prompt */}
+      <LoginPrompt
+        isOpen={showLoginPrompt}
+        onClose={() => setShowLoginPrompt(false)}
+        message={
+          loginAction === 'add' 
+            ? "Please sign in to add new users to your workout tracker" 
+            : loginAction === 'edit'
+            ? "Please sign in to edit user information"
+            : "Please sign in to delete users from your workout tracker"
+        }
+      />
     </>
   );
 } 

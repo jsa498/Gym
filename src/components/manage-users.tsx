@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { supabase } from '@/lib/supabase';
@@ -14,6 +14,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from './ui/dialog';
+import { useAuth } from '@/lib/auth-context';
 
 export function ManageUsers() {
   const { users, currentUser, setCurrentUser } = useWorkout();
@@ -22,11 +23,20 @@ export function ManageUsers() {
   const [editingUser, setEditingUser] = useState<{ id: number; username: string } | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
+  const [isSystemUser, setIsSystemUser] = useState(false);
+  const { user: authUser } = useAuth();
+  const [displayUsers, setDisplayUsers] = useState<string[]>([]);
+
+  // Use users from context that are already filtered
+  useEffect(() => {
+    setDisplayUsers(users);
+  }, [users]);
 
   const togglePanel = () => {
     setIsOpen(!isOpen);
     setNewUsername('');
     setEditingUser(null);
+    setIsSystemUser(false);
   };
 
   const addUser = async () => {
@@ -47,7 +57,10 @@ export function ManageUsers() {
       
       const { error } = await supabase
         .from('users')
-        .insert([{ username: newUsername.trim() }])
+        .insert([{ 
+          username: newUsername.trim(),
+          auth_id: authUser?.id || null  // Associate with current auth user if logged in
+        }])
         .select('id, username');
         
       if (error) throw error;
@@ -60,6 +73,10 @@ export function ManageUsers() {
 
   const startEditing = async (username: string) => {
     try {
+      // Check if this is one of the system users (Name 1 or Name 2)
+      const isSystemUser = username === 'Name 1' || username === 'Name 2';
+      setIsSystemUser(isSystemUser);
+      
       const { data, error } = await supabase
         .from('users')
         .select('id, username')
@@ -83,6 +100,13 @@ export function ManageUsers() {
     try {
       const oldUsername = editingUser.username;
       
+      // If updating a system user, show a warning message
+      if (isSystemUser) {
+        if (!confirm(`Warning: "${oldUsername}" is a template user. Changing this name will affect the default view for non-logged in users. Proceed?`)) {
+          return;
+        }
+      }
+      
       // Update username using the function we created in the database
       const { error } = await supabase.rpc('update_username', {
         old_username: oldUsername,
@@ -98,12 +122,19 @@ export function ManageUsers() {
       
       setEditingUser(null);
       setNewUsername('');
+      setIsSystemUser(false);
     } catch (error) {
       console.error('Error updating user:', error);
     }
   };
 
   const openDeleteConfirmation = (username: string) => {
+    // Check if this is one of the system users (Name 1 or Name 2)
+    if (username === 'Name 1' || username === 'Name 2') {
+      alert('Cannot delete template users. You can rename them instead.');
+      return;
+    }
+    
     setUserToDelete(username);
     setDeleteDialogOpen(true);
   };
@@ -160,7 +191,7 @@ export function ManageUsers() {
           <div className="space-y-6">
             {/* List of existing users */}
             <div className="space-y-2">
-              {users.map((user) => (
+              {displayUsers.map((user) => (
                 <div key={user} className="flex items-center justify-between p-2 rounded hover:bg-zinc-800">
                   <span>{user}</span>
                   <div className="flex gap-2">

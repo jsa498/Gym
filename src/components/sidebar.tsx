@@ -17,6 +17,8 @@ import { useWorkout } from '@/lib/workout-context';
 import { UserManagement } from './user-management';
 import { WorkoutManagement } from './workout-management';
 import { Settings } from './settings';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/auth-context';
 
 type SettingsView = 'users' | 'workouts' | 'settings' | null;
 
@@ -28,6 +30,8 @@ export function Sidebar() {
   const hoverTimerRef = useRef<NodeJS.Timeout | null>(null);
   const ignoreNextCloseRef = useRef(false);
   const [isMobile, setIsMobile] = useState(false);
+  const router = useRouter();
+  const { user: authUser, signOut } = useAuth();
   
   // Check if device is mobile based on screen width
   useEffect(() => {
@@ -44,6 +48,12 @@ export function Sidebar() {
     // Cleanup
     return () => window.removeEventListener('resize', checkIfMobile);
   }, []);
+  
+  const handleSignOut = async () => {
+    await signOut();
+    router.push('/auth');
+    router.refresh();
+  };
   
   const menuItems = [
     {
@@ -93,14 +103,11 @@ export function Sidebar() {
   };
 
   const handleMouseLeave = () => {
-    if (!isMobile) {
-      
-      // Only close if there is no active view
-      if (!activeView) {
-        hoverTimerRef.current = setTimeout(() => {
-          setOpen(false);
-        }, 300);
-      }
+    if (!isMobile && !activeView) {
+      // Only close if there's no active view (meaning we're just in the menu)
+      hoverTimerRef.current = setTimeout(() => {
+        setOpen(false);
+      }, 300);
     }
   };
 
@@ -214,6 +221,23 @@ export function Sidebar() {
               e.stopPropagation();
               handleViewInteraction(e);
             }}
+            onMouseEnter={() => {
+              if (!isMobile) {
+                // Clear any pending close timer when mouse enters SheetContent
+                if (hoverTimerRef.current) {
+                  clearTimeout(hoverTimerRef.current);
+                  hoverTimerRef.current = null;
+                }
+              }
+            }}
+            onMouseLeave={() => {
+              if (!isMobile && !activeView) {
+                // Only close if there's no active view
+                hoverTimerRef.current = setTimeout(() => {
+                  setOpen(false);
+                }, 300);
+              }
+            }}
             hideCloseButton
           >
             <div className="absolute top-4 right-4 z-50">
@@ -236,7 +260,7 @@ export function Sidebar() {
                 <SheetHeader className="p-6 pb-2">
                   <SheetTitle className="text-xl font-bold text-white">Workout Tracker</SheetTitle>
                   <SheetDescription className="text-white/70">
-                    Logged in as {currentUser}
+                    {authUser ? `Logged in as ${authUser.email}` : `Workout for ${currentUser}`}
                   </SheetDescription>
                 </SheetHeader>
                 
@@ -247,6 +271,7 @@ export function Sidebar() {
                         className="flex items-center space-x-4 w-full p-3 rounded-md hover:bg-white/10 transition-colors"
                         onClick={(e) => {
                           e.stopPropagation();
+                          // Just set the active view without closing
                           setActiveView(item.id);
                         }}
                       >
@@ -266,8 +291,33 @@ export function Sidebar() {
                 </div>
                 
                 <SheetFooter className="p-6 pt-0">
-                  <div className="text-xs text-white/50 text-center">
-                    Version 1.0.0
+                  <div className="flex flex-col items-center space-y-4 w-full">
+                    {authUser ? (
+                      <button 
+                        className="w-full p-3 rounded-md bg-white/10 hover:bg-white/20 transition-colors text-white font-medium"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSignOut();
+                          setOpen(false); // Close sidebar after sign out
+                        }}
+                      >
+                        Sign Out
+                      </button>
+                    ) : (
+                      <button 
+                        className="w-full p-3 rounded-md bg-white/10 hover:bg-white/20 transition-colors text-white font-medium"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpen(false); // Close sidebar before navigating
+                          router.push('/auth');
+                        }}
+                      >
+                        Sign In
+                      </button>
+                    )}
+                    <div className="text-xs text-white/50">
+                      Version 1.0.0
+                    </div>
                   </div>
                 </SheetFooter>
               </>

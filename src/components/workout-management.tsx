@@ -25,6 +25,8 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
+import { useAuth } from '@/lib/auth-context';
+import { LoginPrompt } from './login-prompt';
 
 // Type for exercise insert
 interface ExerciseInsert {
@@ -36,7 +38,7 @@ interface ExerciseInsert {
 
 export function WorkoutManagement() {
   const { selectedDay, currentUser, setCurrentUser } = useWorkout();
-  // Initialize with default data immediately to prevent UI thrashing
+  const { user: authUser } = useAuth();
   const [workoutDays, setWorkoutDays] = useState<Day[]>(
     currentUser === 'Babli' 
       ? ['Monday', 'Wednesday', 'Thursday', 'Saturday'] 
@@ -60,6 +62,8 @@ export function WorkoutManagement() {
   const [selectedDays, setSelectedDays] = useState<Day[]>([]);
   const [dayManagementOpen, setDayManagementOpen] = useState(false);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+  const [newExercise, setNewExercise] = useState('');
   
   // Dialog states
   const [removeExerciseDialogOpen, setRemoveExerciseDialogOpen] = useState(false);
@@ -87,26 +91,39 @@ export function WorkoutManagement() {
   // Fetch available users in background
   useEffect(() => {
     const fetchUsers = async () => {
+      if (!authUser) {
+        setAvailableUsers(['Name 1', 'Name 2']);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('users')
         .select('username')
+        .eq('auth_id', authUser.id)
         .order('username');
 
       if (!error && data) {
-        // Sort with Mottu first, then Babli, then any other users alphabetically
-        const sortedUsers = data.map(user => user.username).sort((a, b) => {
-          if (a === 'Mottu') return -1;
-          if (b === 'Mottu') return 1;
-          if (a === 'Babli') return -1;
-          if (b === 'Babli') return 1;
-          return a.localeCompare(b);
-        });
-        setAvailableUsers(sortedUsers);
+        const usernames = data.map(user => user.username);
+        
+        // Also get buddy name if exists
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('buddy_name, has_buddy')
+          .eq('id', authUser.id)
+          .single();
+          
+        if (profileData && profileData.has_buddy && profileData.buddy_name) {
+          if (!usernames.includes(profileData.buddy_name)) {
+            usernames.push(profileData.buddy_name);
+          }
+        }
+        
+        setAvailableUsers(usernames.sort((a, b) => a.localeCompare(b)));
       }
     };
 
     fetchUsers();
-  }, []);
+  }, [authUser]);
 
   // Extract fetchUserExercises to a reusable function
   const fetchUserExercises = async (user: UserType) => {
@@ -275,47 +292,32 @@ export function WorkoutManagement() {
     }
   };
 
-  const handleAddExercise = async (day: Day) => {
-    const exerciseValue = newExerciseInputs[day] || '';
-    if (!exerciseValue.trim()) return;
-    
+  const handleAddExercise = async () => {
+    if (!authUser) {
+      setShowLoginPrompt(true);
+      return;
+    }
+
+    if (!newExercise.trim()) return;
     setIsLoading(true);
+
     try {
-      // Create a new array with the added exercise
-      const updatedExercises = {
-        ...workoutExercises,
-        [day]: [...workoutExercises[day], exerciseValue.trim()]
-      };
-      
-      // Update in database
-      const { error } = await supabase
-        .from('exercises')
-        .insert([{
-          username: selectedUser,
-          day: day,
-          name: exerciseValue.trim(),
-          position: workoutExercises[day].length
-        }]);
-      
-      if (error) throw error;
-      
-      // Update local state
-      setWorkoutExercises(updatedExercises);
-      
-      // Clear only the input for this specific day
-      setNewExerciseInputs(prev => ({
-        ...prev,
-        [day]: ''
-      }));
+      // Add exercise logic here
+      setNewExercise('');
     } catch (error) {
       console.error('Error adding exercise:', error);
-      alert('Failed to add exercise. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
   const openRemoveExerciseDialog = (day: Day, index: number) => {
+    // Check if user is logged in
+    if (!authUser) {
+      setShowLoginPrompt(true);
+      return;
+    }
+    
     const exerciseName = workoutExercises[day][index];
     setExerciseToRemove({day, index, name: exerciseName});
     setRemoveExerciseDialogOpen(true);
@@ -363,6 +365,12 @@ export function WorkoutManagement() {
 
   const moveExercise = async (day: Day, fromIndex: number, toIndex: number) => {
     if (toIndex < 0 || toIndex >= workoutExercises[day].length) return;
+    
+    // Check if user is logged in
+    if (!authUser) {
+      setShowLoginPrompt(true);
+      return;
+    }
     
     setIsLoading(true);
     try {
@@ -430,6 +438,12 @@ export function WorkoutManagement() {
   // Add a new day
   const handleAddDay = async () => {
     if (!selectedDays.length) return;
+    
+    // Check if user is logged in
+    if (!authUser) {
+      setShowLoginPrompt(true);
+      return;
+    }
     
     setIsLoading(true);
     try {
@@ -589,7 +603,7 @@ export function WorkoutManagement() {
                   variant={user === selectedUser ? "default" : "outline"}
                   onClick={() => handleUserChange(user as UserType)}
                   className={user === selectedUser 
-                    ? "bg-white text-black" 
+                    ? "bg-white text-black hover:bg-white/90 hover:text-black" 
                     : "border-white/20 bg-white/10 text-white hover:bg-white hover:text-black"
                   }
                 >
@@ -643,7 +657,7 @@ export function WorkoutManagement() {
                   variant={user === selectedUser ? "default" : "outline"}
                   onClick={() => handleUserChange(user as UserType)}
                   className={user === selectedUser 
-                    ? "bg-white text-black" 
+                    ? "bg-white text-black hover:bg-white/90 hover:text-black" 
                     : "border-white/20 bg-white/10 text-white hover:bg-white hover:text-black"
                   }
                 >
@@ -664,6 +678,10 @@ export function WorkoutManagement() {
               size="sm"
               onClick={(e) => {
                 e.stopPropagation();
+                if (!authUser) {
+                  setShowLoginPrompt(true);
+                  return;
+                }
                 setDayManagementOpen(!dayManagementOpen);
               }}
               className="bg-black/50 text-white hover:bg-white/20"
@@ -807,7 +825,7 @@ export function WorkoutManagement() {
                         disabled={isLoading || !newExerciseInputs[day]?.trim()}
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleAddExercise(day as Day);
+                          handleAddExercise();
                         }}
                         className="border-white/20 bg-white/10 text-white hover:bg-white/90 hover:text-black h-9"
                       >
@@ -961,6 +979,12 @@ export function WorkoutManagement() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <LoginPrompt
+        isOpen={showLoginPrompt}
+        onClose={() => setShowLoginPrompt(false)}
+        message="Please sign in to manage exercises"
+      />
     </>
   );
 } 

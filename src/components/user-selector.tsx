@@ -13,10 +13,10 @@ export function UserSelector() {
           key={user}
           variant="outline"
           size="lg"
-          className={`w-32 h-14 text-lg font-medium transition-all border-2 hover:bg-white hover:text-black ${
+          className={`w-32 h-14 text-lg font-medium transition-all border-2 ${
             currentUser === user
-              ? 'bg-white text-black border-white'
-              : 'bg-transparent text-white border-white/20 hover:border-white'
+              ? 'bg-white text-black border-white hover:bg-white/90 hover:text-black'
+              : 'bg-transparent text-white border-white/20 hover:border-white hover:bg-white hover:text-black'
           }`}
           onClick={() => setCurrentUser(user)}
         >
