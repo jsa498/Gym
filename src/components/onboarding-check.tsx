@@ -53,11 +53,8 @@ export function OnboardingCheck() {
         }
         
         // If any setup step is incomplete, show the setup dialog
-        const setupIncomplete = !profile || 
-                               profile.template_preference === null || 
-                               !userEntry || 
-                               !hasWorkoutDays;
-                               
+        const setupIncomplete = !profile || profile.template_preference === null;
+        
         console.log('Setup status check:', { 
           hasProfile: !!profile, 
           hasTemplatePreference: profile?.template_preference !== null,

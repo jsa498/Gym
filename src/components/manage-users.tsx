@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { supabase } from '@/lib/supabase';
@@ -17,7 +17,7 @@ import {
 import { useAuth } from '@/lib/auth-context';
 
 export function ManageUsers() {
-  const { users, currentUser, setCurrentUser } = useWorkout();
+  const { users, currentUser, setCurrentUser, removeUserFromState } = useWorkout();
   const [isOpen, setIsOpen] = useState(false);
   const [newUsername, setNewUsername] = useState('');
   const [editingUser, setEditingUser] = useState<{ id: number; username: string } | null>(null);
@@ -25,12 +25,6 @@ export function ManageUsers() {
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
   const [isSystemUser, setIsSystemUser] = useState(false);
   const { user: authUser } = useAuth();
-  const [displayUsers, setDisplayUsers] = useState<string[]>([]);
-
-  // Use users from context that are already filtered
-  useEffect(() => {
-    setDisplayUsers(users);
-  }, [users]);
 
   const togglePanel = () => {
     setIsOpen(!isOpen);
@@ -60,11 +54,11 @@ export function ManageUsers() {
         .insert([{ 
           username: newUsername.trim(),
           auth_id: authUser?.id || null  // Associate with current auth user if logged in
-        }])
-        .select('id, username');
+        }]);
         
       if (error) throw error;
       
+      // The subscription will update users automatically
       setNewUsername('');
     } catch (error) {
       console.error('Error adding user:', error);
@@ -115,6 +109,8 @@ export function ManageUsers() {
       
       if (error) throw error;
       
+      // The users list will be updated by the real-time subscription
+      
       // If we're updating the current user, update that too
       if (currentUser === oldUsername) {
         setCurrentUser(newUsername.trim());
@@ -143,6 +139,43 @@ export function ManageUsers() {
     if (!userToDelete) return;
     
     try {
+      // Before deleting, also check if this is a buddy user
+      if (authUser?.id) {
+        const { data: buddyData } = await supabase
+          .from('workout_buddies')
+          .select('*')
+          .eq('profile_id', authUser.id)
+          .eq('buddy_name', userToDelete);
+
+        if (buddyData && buddyData.length > 0) {
+          // Also remove from workout_buddies table
+          await supabase
+            .from('workout_buddies')
+            .delete()
+            .eq('profile_id', authUser.id)
+            .eq('buddy_name', userToDelete);
+
+          // Check if this is in the profile's buddy_name
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('buddy_name')
+            .eq('id', authUser.id)
+            .single();
+
+          if (profileData && profileData.buddy_name === userToDelete) {
+            // Update profile to remove buddy
+            await supabase
+              .from('profiles')
+              .update({ 
+                has_buddy: false,
+                buddy_name: null
+              })
+              .eq('id', authUser.id);
+          }
+        }
+      }
+
+      // Delete from users table
       const { error } = await supabase
         .from('users')
         .delete()
@@ -155,6 +188,9 @@ export function ManageUsers() {
         const otherUser = users.find(u => u !== userToDelete);
         if (otherUser) setCurrentUser(otherUser);
       }
+      
+      // Remove from local state immediately for a responsive UI
+      removeUserFromState(userToDelete);
       
       // Close the dialog
       setDeleteDialogOpen(false);
@@ -191,7 +227,7 @@ export function ManageUsers() {
           <div className="space-y-6">
             {/* List of existing users */}
             <div className="space-y-2">
-              {displayUsers.map((user) => (
+              {users.map((user) => (
                 <div key={user} className="flex items-center justify-between p-2 rounded hover:bg-zinc-800">
                   <span>{user}</span>
                   <div className="flex gap-2">

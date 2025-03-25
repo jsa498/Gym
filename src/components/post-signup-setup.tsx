@@ -208,194 +208,163 @@ export function PostSignupSetup({ isOpen, onClose, userId, forceComplete = false
     try {
       console.log('Setting up workout days for user:', userId);
       
-      // Get the current user information - with better error handling
-      let userData;
-      const { data: fetchedUserData, error: userError } = await supabase
-        .from('users')
-        .select('username, id')
-        .eq('auth_id', userId)
-        .single();
-
-      if (userError) {
-        console.error('Error fetching user data:', userError);
+      // First, update profile with buddy information
+      if (hasBuddy && buddyName) {
+        console.log('Setting up buddy for:', buddyName);
         
-        // If user doesn't exist yet, try to create it using profile data
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .select('display_name')
-          .eq('id', userId)
-          .single();
-          
-        if (profileError) {
-          console.error('Error fetching profile data:', profileError);
-        }  
-          
-        if (profileData?.display_name) {
-          // Create user record if it doesn't exist
-          const { data: newUser, error: createError } = await supabase
-            .from('users')
-            .upsert({ 
-              username: profileData.display_name, 
-              auth_id: userId 
+        try {
+          // Update the profile to mark buddy status
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .update({ 
+              has_buddy: true,
+              buddy_name: buddyName,
+              template_preference: templateChoice
             })
-            .select('username, id');
+            .eq('id', userId);
             
-          if (createError) {
-            console.error('Failed to create user record:', createError);
-            throw new Error('Could not create user record');
+          if (profileError) {
+            console.error('Error updating profile with buddy:', profileError);
+            throw profileError;
           }
-          
-          if (newUser && newUser.length > 0) {
-            console.log('Created missing user record:', newUser[0]);
-            userData = newUser[0];
-          } else {
-            throw new Error('User record created but no data returned');
-          }
-        } else {
-          // If no profile data, create a generic username
-          const username = `user_${Date.now().toString().substring(6)}`;
-          const { data: newUser, error: createError } = await supabase
-            .from('users')
-            .upsert({ 
-              username: username, 
-              auth_id: userId 
-            })
-            .select('username, id');
-            
-          if (createError) {
-            console.error('Failed to create generic user record:', createError);
-            throw new Error('Could not create user record');
-          }
-          
-          if (newUser && newUser.length > 0) {
-            console.log('Created generic user record:', newUser[0]);
-            userData = newUser[0];
-          } else {
-            throw new Error('User record created but no data returned');
-          }
+        } catch (buddyErr) {
+          console.error('Error setting up buddy:', buddyErr);
+          throw buddyErr;
         }
-      } else {
-        userData = fetchedUserData;
       }
-      
-      if (!userData) throw new Error('User record not found');
-      
-      console.log('Found user:', userData.username);
-      
-      // Delete existing days for this user's username
+
+      // Now handle workout days
+      console.log('Setting up workout days...');
+
+      // First, delete existing days for the main user
       const { error: deleteError } = await supabase
         .from('user_days')
         .delete()
-        .eq('username', userData.username);
+        .eq('auth_id', userId);
         
       if (deleteError) {
         console.error('Error deleting existing user days:', deleteError);
-      }
-      
-      // Define type for day entries
-      type DayEntry = {
-        username: string;
-        day: string;
-        day_order: number;
-        auth_id?: string;  // Make auth_id optional
-      };
-      
-      // Create days to insert with proper null/undefined handling
-      const daysToInsert: DayEntry[] = selectedDays.map((day, index) => {
-        const entry: DayEntry = {
-          username: userData.username,
-          day,
-          day_order: index + 1
-        };
-        
-        // Only add auth_id if it's a valid UUID
-        if (userId && userId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
-          entry.auth_id = userId;
-        }
-        
-        return entry;
-      });
-
-      console.log('Created day entries for user:', daysToInsert);
-
-      if (hasBuddy && buddyName) {
-        console.log('Setting up buddy days for:', buddyName);
-        
-        try {
-          // Make sure the buddy exists in the users table
-          const { data: existingBuddy, error: buddyError } = await supabase
-            .from('users')
-            .select('username')
-            .eq('username', buddyName)
-            .single();
-            
-          if (buddyError && buddyError.code !== 'PGRST116') {
-            console.error('Error checking for buddy:', buddyError);
-          }
-          
-          // If buddy doesn't exist, create the user record
-          if (!existingBuddy) {
-            console.log('Creating new buddy user record');
-            const { error: insertError } = await supabase
-              .from('users')
-              .insert({
-                username: buddyName
-                // No auth_id for buddy users
-              });
-              
-            if (insertError) {
-              console.error('Error creating buddy user:', insertError);
-            }
-          }
-          
-          // For buddy user, we don't assign an auth_id because they don't have their own authentication
-          const buddyDays = selectedDays.map((day, index) => ({
-            username: buddyName,
-            day,
-            day_order: index + 1
-            // No auth_id for buddy
-          }));
-          
-          console.log('Created buddy day entries:', buddyDays);
-          daysToInsert.push(...buddyDays);
-        } catch (buddyErr) {
-          console.error('Error setting up buddy:', buddyErr);
-          // Continue with main user setup even if buddy setup fails
-        }
+        throw deleteError;
       }
 
-      // Insert all the days with error handling
-      console.log('Inserting day entries:', daysToInsert);
+      // Try to get the current user's username from the profiles table first
+      // This is more reliable than depending on the users table which might not have an entry yet
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('display_name')
+        .eq('id', userId)
+        .single();
+      
+      if (profileError) {
+        console.error('Error fetching profile data:', profileError);
+        throw profileError;
+      }
+      
+      // Use the username from the profile data
+      const username = profileData.display_name;
+      
+      // Now check if we need to create a record in the users table
+      const { data: existingUser, error: userCheckError } = await supabase
+        .from('users')
+        .select('id, username')
+        .eq('auth_id', userId);
+        
+      // If no user exists or there's an error, create the user record
+      if (userCheckError || !existingUser || existingUser.length === 0) {
+        console.log('Creating user record for:', username);
+        
+        // Insert the user record
+        const { error: createUserError } = await supabase
+          .from('users')
+          .insert([{
+            username: username,
+            auth_id: userId
+          }]);
+          
+        if (createUserError) {
+          console.error('Error creating user record:', createUserError);
+          // Continue anyway - the important thing is we have the username
+        }
+      }
+      
+      // Create days entries for main user
+      const mainUserDays = selectedDays.map((day, index) => ({
+        username: username,
+        day,
+        day_order: index + 1,
+        auth_id: userId
+      }));
+
+      // Create days entries for buddy if needed
+      const buddyDays = hasBuddy && buddyName ? selectedDays.map((day, index) => ({
+        username: buddyName,
+        day,
+        day_order: index + 1,
+        auth_id: userId  // Associate buddy days with the main user's auth_id
+      })) : [];
+
+      // Insert all days at once
+      const allDays = [...mainUserDays, ...buddyDays];
       const { error: insertError } = await supabase
         .from('user_days')
-        .insert(daysToInsert);
+        .insert(allDays);
         
       if (insertError) {
         console.error('Error inserting user days:', insertError);
         throw insertError;
       }
 
-      // Update template preference to mark setup as complete
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ 
-          template_preference: templateChoice,
-          has_buddy: hasBuddy,
-          buddy_name: hasBuddy ? buddyName : null
-        })
-        .eq('id', userId);
+      // Now create the buddy user record if needed
+      if (hasBuddy && buddyName) {
+        console.log('Creating/updating buddy user record for:', buddyName);
         
-      if (updateError) {
-        console.error('Error updating profile preferences:', updateError);
-        throw updateError;
+        // Check if the buddy already exists as a user
+        const { data: existingBuddy } = await supabase
+          .from('users')
+          .select('id, username')
+          .eq('username', buddyName);
+          
+        // If buddy doesn't exist, create them
+        if (!existingBuddy || existingBuddy.length === 0) {
+          const { error: createBuddyError } = await supabase
+            .from('users')
+            .insert([{
+              username: buddyName,
+              auth_id: userId  // Associate with the current auth user
+            }]);
+            
+          if (createBuddyError) {
+            console.error('Error creating buddy user record:', createBuddyError);
+            // Continue anyway - the important thing is to have user days created
+          }
+        }
+        
+        // Create a workout buddy record in the workout_buddies table
+        const { error: buddyLinkError } = await supabase
+          .from('workout_buddies')
+          .upsert({
+            profile_id: userId,
+            buddy_name: buddyName
+          }, { onConflict: 'profile_id,buddy_name' });
+          
+        if (buddyLinkError) {
+          console.error('Error creating workout buddy link:', buddyLinkError);
+          // Continue anyway since this is a secondary feature
+        }
       }
-      
-      console.log('Setup completed successfully for user:', userId);
 
-      // Successfully set up - continue to main app
+      console.log('Workout days setup completed');
+      
+      // Close the signup modal and redirect
       onClose();
-      router.push('/');
-      router.refresh();
+      
+      // Redirect to the main page
+      if (window.location.pathname !== '/') {
+        router.push('/');
+      } else {
+        // Force a refresh if already on the main page
+        router.refresh();
+      }
     } catch (error) {
       console.error('Error saving workout days:', error);
       alert('There was an error setting up your workout days. Please try again.');

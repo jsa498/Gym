@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useWorkout } from '@/lib/workout-context';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,8 +20,7 @@ import { useAuth } from '@/lib/auth-context';
 import { LoginPrompt } from './login-prompt';
 
 export function UserManagement() {
-  const { currentUser, setCurrentUser } = useWorkout();
-  const [users, setUsers] = useState<string[]>(['Name 1', 'Name 2']);
+  const { currentUser, setCurrentUser, users, removeUserFromState } = useWorkout();
   const [newUser, setNewUser] = useState('');
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editingName, setEditingName] = useState('');
@@ -31,44 +30,6 @@ export function UserManagement() {
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
   const [loginAction, setLoginAction] = useState<'add' | 'edit' | 'delete'>('add');
   const { user: authUser } = useAuth();
-
-  // Fetch users and sort them consistently
-  useEffect(() => {
-    const fetchUsers = async () => {
-      // If not authenticated, use default users
-      if (!authUser) {
-        setUsers(['Name 1', 'Name 2']);
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from('users')
-        .select('username')
-        .eq('auth_id', authUser.id);
-
-      if (!error && data) {
-        const usernames = data.map(user => user.username);
-        
-        // Also get buddy name if exists
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('buddy_name, has_buddy')
-          .eq('id', authUser.id)
-          .single();
-          
-        if (profileData && profileData.has_buddy && profileData.buddy_name) {
-          if (!usernames.includes(profileData.buddy_name)) {
-            usernames.push(profileData.buddy_name);
-          }
-        }
-        
-        // Sort alphabetically
-        setUsers(usernames.sort((a, b) => a.localeCompare(b)));
-      }
-    };
-
-    fetchUsers();
-  }, [authUser]);
 
   const handleAddUser = async () => {
     if (!newUser.trim()) return;
@@ -82,25 +43,93 @@ export function UserManagement() {
     
     setIsLoading(true);
     try {
-      // Add user to Supabase
-      const { error } = await supabase
-        .from('users')
-        .insert([{ 
-          username: newUser.trim(),
-          auth_id: authUser.id
-        }]);
+      // Get current profile data
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('buddy_name, has_buddy, display_name')
+        .eq('id', authUser.id)
+        .single();
         
-      if (error) throw error;
+      if (profileError) throw profileError;
       
-      // Update local state with proper sorting
-      const updatedUsers = [...users, newUser.trim()].sort((a, b) => {
-        if (a === 'Name 1') return -1;
-        if (b === 'Name 1') return 1;
-        if (a === 'Name 2') return -1;
-        if (b === 'Name 2') return 1;
-        return a.localeCompare(b);
-      });
-      setUsers(updatedUsers);
+      const buddyName = newUser.trim();
+      
+      // If we already have a buddy, add the new user as a regular user
+      if (profileData && profileData.has_buddy && profileData.buddy_name) {
+        // Add user to Supabase users table
+        const { error } = await supabase
+          .from('users')
+          .insert([{ 
+            username: buddyName,
+            auth_id: authUser.id  // Associate with the current user
+          }]);
+          
+        if (error) throw error;
+      } else {
+        // No buddy yet, so add as buddy in the profile
+        const { error } = await supabase
+          .from('profiles')
+          .update({ 
+            has_buddy: true,
+            buddy_name: buddyName
+          })
+          .eq('id', authUser.id);
+          
+        if (error) throw error;
+        
+        // Also add to users table for consistency
+        const { error: userError } = await supabase
+          .from('users')
+          .insert([{ 
+            username: buddyName,
+            auth_id: authUser.id  // Associate with the current user
+          }]);
+          
+        if (userError) {
+          console.error('Error adding buddy to users table:', userError);
+          // Continue anyway, as the profile update succeeded
+        }
+        
+        // Create a workout buddy record for proper tracking
+        const { error: buddyError } = await supabase
+          .from('workout_buddies')
+          .upsert({
+            profile_id: authUser.id,
+            buddy_name: buddyName
+          }, { onConflict: 'profile_id,buddy_name' });
+          
+        if (buddyError) {
+          console.error('Error creating workout buddy link:', buddyError);
+          // Continue anyway, as this is a secondary feature
+        }
+        
+        // If there are workout days for the main user, create the same days for the buddy
+        const { data: userDays, error: daysError } = await supabase
+          .from('user_days')
+          .select('day, day_order')
+          .eq('auth_id', authUser.id)
+          .eq('username', profileData.display_name);
+          
+        if (!daysError && userDays && userDays.length > 0) {
+          // Create days for the buddy
+          const buddyDays = userDays.map(dayData => ({
+            username: buddyName,
+            day: dayData.day,
+            day_order: dayData.day_order,
+            auth_id: authUser.id
+          }));
+          
+          const { error: insertDaysError } = await supabase
+            .from('user_days')
+            .insert(buddyDays);
+            
+          if (insertDaysError) {
+            console.error('Error creating workout days for buddy:', insertDaysError);
+          }
+        }
+      }
+      
+      // The real-time subscription will update the users list
       setNewUser('');
     } catch (error) {
       console.error('Error adding user:', error);
@@ -133,22 +162,62 @@ export function UserManagement() {
   const handleDeleteUser = async () => {
     if (userToDeleteIndex === null) return;
     
-    const userToDelete = users[userToDeleteIndex];
+    const userToDeleteName = users[userToDeleteIndex];
     
     setIsLoading(true);
     try {
-      // Delete user from Supabase
-      const { error } = await supabase
-        .from('users')
-        .delete()
-        .eq('username', userToDelete);
+      // First check if this is a buddy user
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('buddy_name, has_buddy')
+        .eq('id', authUser?.id || '')
+        .single();
         
-      if (error) throw error;
+      if (profileError) throw profileError;
       
-      // Update local state
-      const newUsers = [...users];
-      newUsers.splice(userToDeleteIndex, 1);
-      setUsers(newUsers);
+      if (profileData && profileData.has_buddy && profileData.buddy_name === userToDeleteName) {
+        // This is a buddy user, update the profile
+        const { error } = await supabase
+          .from('profiles')
+          .update({ 
+            has_buddy: false,
+            buddy_name: null
+          })
+          .eq('id', authUser?.id || '');
+          
+        if (error) throw error;
+        
+        // Also delete from workout_buddies table for real-time updates
+        if (authUser?.id) {
+          await supabase
+            .from('workout_buddies')
+            .delete()
+            .eq('profile_id', authUser.id)
+            .eq('buddy_name', userToDeleteName);
+        }
+        
+        // Also delete any workout data for this buddy
+        await supabase
+          .from('user_days')
+          .delete()
+          .eq('username', userToDeleteName);
+          
+        await supabase
+          .from('workout_sets')
+          .delete()
+          .eq('username', userToDeleteName);
+      } else {
+        // This is a regular user, delete from users table
+        const { error } = await supabase
+          .from('users')
+          .delete()
+          .eq('username', userToDeleteName);
+          
+        if (error) throw error;
+      }
+      
+      // Update local state immediately for responsive UI
+      removeUserFromState(userToDeleteName);
       
       // Close the dialog
       setDeleteDialogOpen(false);
@@ -194,20 +263,7 @@ export function UserManagement() {
       
       if (error) throw error;
       
-      // Update local state with proper sorting
-      const updatedUsers = [...users];
-      updatedUsers[editingIndex] = newUsername;
-      
-      // Apply consistent sorting
-      const sortedUsers = updatedUsers.sort((a, b) => {
-        if (a === 'Name 1') return -1;
-        if (b === 'Name 1') return 1;
-        if (a === 'Name 2') return -1;
-        if (b === 'Name 2') return 1;
-        return a.localeCompare(b);
-      });
-      
-      setUsers(sortedUsers);
+      // The users list will be updated by the real-time subscription
       
       // If the current user was renamed, update that too
       if (currentUser === oldUsername) {

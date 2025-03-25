@@ -292,20 +292,52 @@ export function WorkoutManagement() {
     }
   };
 
-  const handleAddExercise = async () => {
+  const handleAddExercise = async (day: Day) => {
     if (!authUser) {
       setShowLoginPrompt(true);
       return;
     }
 
-    if (!newExercise.trim()) return;
+    const exerciseName = newExerciseInputs[day]?.trim();
+    if (!exerciseName) return;
+    
     setIsLoading(true);
-
     try {
-      // Add exercise logic here
-      setNewExercise('');
+      // Create a new array with the added exercise
+      const dayExercises = [...workoutExercises[day]];
+      const position = dayExercises.length; // Add to the end
+      dayExercises.push(exerciseName);
+      
+      // Update local state immediately for responsive UI
+      const updatedExercises = {
+        ...workoutExercises,
+        [day]: dayExercises
+      };
+      setWorkoutExercises(updatedExercises);
+      
+      // Add exercise to database
+      const { error } = await supabase
+        .from('exercises')
+        .insert({
+          username: selectedUser,
+          day: day,
+          name: exerciseName,
+          position: position
+        });
+      
+      if (error) throw error;
+      
+      // Clear the input field
+      setNewExerciseInputs(prev => ({
+        ...prev,
+        [day]: ''
+      }));
     } catch (error) {
       console.error('Error adding exercise:', error);
+      alert('Failed to add exercise. Please try again.');
+      
+      // Restore original exercises if there was an error
+      fetchUserExercises(selectedUser);
     } finally {
       setIsLoading(false);
     }
@@ -825,7 +857,7 @@ export function WorkoutManagement() {
                         disabled={isLoading || !newExerciseInputs[day]?.trim()}
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleAddExercise();
+                          handleAddExercise(day);
                         }}
                         className="border-white/20 bg-white/10 text-white hover:bg-white/90 hover:text-black h-9"
                       >
