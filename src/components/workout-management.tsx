@@ -63,7 +63,6 @@ export function WorkoutManagement() {
   const [dayManagementOpen, setDayManagementOpen] = useState(false);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
-  const [newExercise, setNewExercise] = useState('');
   
   // Dialog states
   const [removeExerciseDialogOpen, setRemoveExerciseDialogOpen] = useState(false);

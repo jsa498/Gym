@@ -30,32 +30,39 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
 
   // Enhanced setCurrentUser that handles the case where a user is deleted
   const setCurrentUser = useCallback((user: string) => {
-    // If the user exists in the users array, set it as current
-    // Otherwise, select the first available user as fallback
-    if (users.includes(user)) {
-      setCurrentUserState(user);
-    } else if (users.length > 0) {
-      setCurrentUserState(users[0]);
+    // Only update if the user is different from current user to prevent unnecessary updates
+    if (user !== currentUser) {
+      // If the user exists in the users array, set it as current
+      // Otherwise, select the first available user as fallback
+      if (users.includes(user)) {
+        setCurrentUserState(user);
+      } else if (users.length > 0) {
+        setCurrentUserState(users[0]);
+      }
     }
-  }, [users]);
+  }, [users, currentUser]);
   
   // Function to remove a user from the local state (used for UI updates)
   const removeUserFromState = useCallback((username: string) => {
-    setUsers(prevUsers => prevUsers.filter(u => u !== username));
+    // Store the filtered users to avoid recalculation
+    const remainingUsers = users.filter(u => u !== username);
+    setUsers(remainingUsers);
     
     // If the current user is removed, switch to another user
-    if (currentUser === username && users.length > 1) {
-      const otherUser = users.find(u => u !== username);
-      if (otherUser) setCurrentUserState(otherUser);
+    if (currentUser === username && remainingUsers.length > 0) {
+      // Use the first remaining user directly instead of searching again
+      setCurrentUserState(remainingUsers[0]);
     }
   }, [currentUser, users]);
 
   // Update current user if it's not in the users list
   useEffect(() => {
-    if (users.length > 0 && !users.includes(currentUser)) {
-      setCurrentUser(users[0]);
+    // Only update if we have users and the current user is not in the list
+    // Add an additional check for non-empty currentUser to avoid unnecessary updates
+    if (users.length > 0 && currentUser && !users.includes(currentUser)) {
+      setCurrentUserState(users[0]); // Use setCurrentUserState instead of setCurrentUser to avoid cycles
     }
-  }, [users, currentUser, setCurrentUser]);
+  }, [users, currentUser]);
 
   // Function to fetch users
   const fetchUsers = useCallback(async () => {
@@ -222,7 +229,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     };
 
     fetchUserProfile();
-  }, [authUser, fetchUsers]);
+  }, [authUser, fetchUsers, setCurrentUser]);
 
   // Subscribe to real-time changes in users and profiles tables
   useEffect(() => {
@@ -500,6 +507,6 @@ export function useWorkout() {
   }
   return {
     ...context,
-    removeUserFromState: (context as any).removeUserFromState
+    removeUserFromState: context.removeUserFromState
   };
 } 
