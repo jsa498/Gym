@@ -62,7 +62,8 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     if (users.length > 0 && currentUser && !users.includes(currentUser)) {
       setCurrentUserState(users[0]); // Use setCurrentUserState instead of setCurrentUser to avoid cycles
     }
-  }, [users, currentUser]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [users]); // Removed currentUser from dependencies to avoid potential loops
 
   // Function to fetch users
   const fetchUsers = useCallback(async () => {
@@ -229,7 +230,8 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     };
 
     fetchUserProfile();
-  }, [authUser, fetchUsers, setCurrentUser]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authUser, fetchUsers]); // Removed setCurrentUser from dependencies to prevent infinite loops
 
   // Subscribe to real-time changes in users and profiles tables
   useEffect(() => {

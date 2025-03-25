@@ -85,7 +85,8 @@ export function DaySelector() {
     return () => {
       isMounted = false;
     };
-  }, [currentUser]); // Removing both selectedDay and setSelectedDay from deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser]); // Only depend on currentUser to prevent infinite loops
 
   // Create a stable value object to prevent unnecessary re-renders
   const selectValue = React.useMemo(() => {
