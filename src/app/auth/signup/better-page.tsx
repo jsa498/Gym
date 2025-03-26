@@ -145,7 +145,7 @@ export default function ImprovedSignUpPage() {
         <div className="w-full max-w-sm space-y-6 relative">
           <button 
             onClick={() => router.push('/')}
-            className="absolute -left-12 top-0 p-2 text-white/70 hover:text-white transition-colors rounded-full hover:bg-white/10"
+            className="absolute left-0 top-0 md:-left-12 p-2 text-white/70 hover:text-white transition-colors rounded-full hover:bg-white/10"
             aria-label="Back to Workout"
             title="Back to Workout Tracker"
           >
