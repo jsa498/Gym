@@ -12,6 +12,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
 interface SetListProps {
   exerciseName: string;
@@ -60,59 +68,75 @@ export function SetList({ exerciseName }: SetListProps) {
         </div>
 
         <div className="rounded-lg overflow-hidden">
-          <div className="grid grid-cols-4 gap-4 bg-black/30 p-4 text-white">
-            <div>
-              <div className="text-sm text-white/60 mb-1">Warmup</div>
-              <div className="font-medium">{lastSet.warmup}</div>
-            </div>
-            <div>
-              <div className="text-sm text-white/60 mb-1">Weight (lbs)</div>
-              <div className="font-medium">{lastSet.weight}</div>
-            </div>
-            <div>
-              <div className="text-sm text-white/60 mb-1">Reps</div>
-              <div className="font-medium">{lastSet.reps}</div>
-            </div>
-            <div>
-              <div className="text-sm text-white/60 mb-1">Goal</div>
-              <div className="font-medium">{lastSet.goal}</div>
-            </div>
-          </div>
+          <Table>
+            <TableHeader>
+              <TableRow className="border-b-2 border-white/20 hover:bg-transparent">
+                <TableHead className="text-white/70 font-medium text-sm">Warmup</TableHead>
+                <TableHead className="text-white/70 font-medium text-sm">Weight (lbs)</TableHead>
+                <TableHead className="text-white/70 font-medium text-sm">Reps</TableHead>
+                <TableHead className="text-white/70 font-medium text-sm">Goal</TableHead>
+                <TableHead className="text-white/70 font-medium text-sm w-[100px]">Action</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <TableRow className="border-b border-white/10 last:border-0 hover:bg-white/5">
+                <TableCell className="font-medium">{lastSet.warmup}</TableCell>
+                <TableCell>{lastSet.weight}</TableCell>
+                <TableCell>{lastSet.reps}</TableCell>
+                <TableCell>{lastSet.goal}</TableCell>
+                <TableCell>
+                  <Button 
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleDelete(sets.length - 1)}
+                    className="h-8 w-8 rounded-full bg-black/30 text-white/70 hover:text-white hover:bg-white/10"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
         </div>
       </div>
 
-      {/* History Dialog */}
       <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
         <DialogContent className="bg-black/95 border-white/20 text-white max-w-xl">
           <DialogHeader>
             <DialogTitle className="text-center">{exerciseName} History</DialogTitle>
           </DialogHeader>
           <div className="mt-4 space-y-4 max-h-96 overflow-y-auto pr-1">
-            <div className="grid grid-cols-5 gap-4 text-sm font-medium text-white/70 pb-2 border-b border-white/10">
-              <div>Warmup</div>
-              <div>Weight</div>
-              <div>Reps</div>
-              <div>Goal</div>
-              <div className="text-right">Action</div>
-            </div>
-            {[...sets].reverse().map((set, index) => (
-              <div key={index} className="grid grid-cols-5 gap-4 items-center py-2 border-b border-white/10">
-                <div className="text-white">{set.warmup}</div>
-                <div className="text-white">{set.weight}</div>
-                <div className="text-white">{set.reps}</div>
-                <div className="text-white">{set.goal}</div>
-                <div className="text-right">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleDelete(sets.length - 1 - index)}
-                    className="h-8 w-8 text-white/70 hover:text-white hover:bg-white/10"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            ))}
+            <Table>
+              <TableHeader>
+                <TableRow className="border-b border-white/30 bg-black/50 hover:bg-black/50">
+                  <TableHead className="text-white/70 font-medium text-sm">Warmup</TableHead>
+                  <TableHead className="text-white/70 font-medium text-sm">Weight (lbs)</TableHead>
+                  <TableHead className="text-white/70 font-medium text-sm">Reps</TableHead>
+                  <TableHead className="text-white/70 font-medium text-sm">Goal</TableHead>
+                  <TableHead className="text-white/70 font-medium text-sm text-right">Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {[...sets].reverse().map((set, index) => (
+                  <TableRow key={index} className="border-b border-white/10 last:border-0 hover:bg-white/5">
+                    <TableCell className="text-white">{set.warmup}</TableCell>
+                    <TableCell className="text-white">{set.weight}</TableCell>
+                    <TableCell className="text-white">{set.reps}</TableCell>
+                    <TableCell className="text-white">{set.goal}</TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDelete(sets.length - 1 - index)}
+                        className="h-8 w-8 rounded-full bg-black/30 text-white/70 hover:text-white hover:bg-white/10"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </div>
         </DialogContent>
       </Dialog>
@@ -120,7 +144,7 @@ export function SetList({ exerciseName }: SetListProps) {
       <LoginPrompt
         isOpen={showLoginPrompt}
         onClose={() => setShowLoginPrompt(false)}
-        message="Please sign in to delete workout sets"
+        message="Please sign in to manage sets"
       />
     </>
   );

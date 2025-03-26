@@ -19,6 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from './ui/table';
+import { Trash2 } from 'lucide-react';
 
 interface WorkoutHistoryProps {
   exerciseName: string;
@@ -29,10 +30,10 @@ interface WorkoutSet {
   created_at: string;
   username: string;
   exercise: string;
-  warmup: boolean;
-  weight: number;
-  reps: number;
-  goal: number;
+  warmup: string;
+  weight: string;
+  reps: string;
+  goal: string;
 }
 
 export function WorkoutHistory({ exerciseName }: WorkoutHistoryProps) {
@@ -70,6 +71,22 @@ export function WorkoutHistory({ exerciseName }: WorkoutHistoryProps) {
     });
   };
 
+  const handleDelete = async (setId: string) => {
+    try {
+      const { error } = await supabase
+        .from('workout_sets')
+        .delete()
+        .eq('id', setId);
+
+      if (error) throw error;
+
+      // Refresh the history after deletion
+      loadHistory();
+    } catch (error) {
+      console.error('Error deleting workout set:', error);
+    }
+  };
+
   return (
     <Dialog>
       <DialogTrigger asChild>
@@ -102,6 +119,7 @@ export function WorkoutHistory({ exerciseName }: WorkoutHistoryProps) {
                     <TableHead className="text-white font-medium text-sm">Weight (lbs)</TableHead>
                     <TableHead className="text-white font-medium text-sm">Reps</TableHead>
                     <TableHead className="text-white font-medium text-sm">Goal</TableHead>
+                    <TableHead className="text-white font-medium text-sm text-right">Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -111,10 +129,20 @@ export function WorkoutHistory({ exerciseName }: WorkoutHistoryProps) {
                       className="border-b border-white/10 last:border-0 hover:bg-white/5"
                     >
                       <TableCell className="font-medium text-white">{formatDate(set.created_at)}</TableCell>
-                      <TableCell className="text-white">{set.warmup ? 'Yes' : 'No'}</TableCell>
+                      <TableCell className="text-white">{set.warmup}</TableCell>
                       <TableCell className="text-white">{set.weight}</TableCell>
                       <TableCell className="text-white">{set.reps}</TableCell>
                       <TableCell className="text-white">{set.goal}</TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDelete(set.id)}
+                          className="h-8 w-8 rounded-full bg-black/30 text-white/70 hover:text-white hover:bg-white/10"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
