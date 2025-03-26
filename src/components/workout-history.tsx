@@ -115,7 +115,6 @@ export function WorkoutHistory({ exerciseName }: WorkoutHistoryProps) {
                 <TableHeader>
                   <TableRow className="border-b border-white/30 bg-black/50 hover:bg-black/50">
                     <TableHead className="text-white font-medium text-sm">Date</TableHead>
-                    <TableHead className="text-white font-medium text-sm">Warmup</TableHead>
                     <TableHead className="text-white font-medium text-sm">Weight (lbs)</TableHead>
                     <TableHead className="text-white font-medium text-sm">Reps</TableHead>
                     <TableHead className="text-white font-medium text-sm">Goal</TableHead>
@@ -129,7 +128,6 @@ export function WorkoutHistory({ exerciseName }: WorkoutHistoryProps) {
                       className="border-b border-white/10 last:border-0 hover:bg-white/5"
                     >
                       <TableCell className="font-medium text-white">{formatDate(set.created_at)}</TableCell>
-                      <TableCell className="text-white">{set.warmup}</TableCell>
                       <TableCell className="text-white">{set.weight}</TableCell>
                       <TableCell className="text-white">{set.reps}</TableCell>
                       <TableCell className="text-white">{set.goal}</TableCell>
