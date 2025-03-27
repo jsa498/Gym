@@ -5,6 +5,7 @@ import { WorkoutProvider } from '@/lib/workout-context';
 import { Sidebar } from '@/components/sidebar';
 import { AuthProvider } from '@/lib/auth-context';
 import { OnboardingCheck } from '@/components/onboarding-check';
+import { Toaster } from '@/components/ui/toaster';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -26,6 +27,7 @@ export default function RootLayout({
             <Sidebar />
             {children}
             <OnboardingCheck />
+            <Toaster />
           </WorkoutProvider>
         </AuthProvider>
       </body>

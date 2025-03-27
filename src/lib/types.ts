@@ -18,6 +18,18 @@ export type ExercisesByDay = {
   [key in Day]: string[];
 };
 
+export type SubscriptionPlan = 'free' | 'plus' | 'pro';
+
+export interface SubscriptionLimits {
+  maxWorkoutDays: number;
+}
+
+export const subscriptionLimits: Record<SubscriptionPlan, SubscriptionLimits> = {
+  free: { maxWorkoutDays: 3 },
+  plus: { maxWorkoutDays: 999 }, // Effectively unlimited
+  pro: { maxWorkoutDays: 999 }   // Effectively unlimited
+};
+
 export const exercises: ExercisesByDay = {
   Monday: ['Chest Press', 'Incline Dumbbell Press', 'Lateral Raises', 'Bicep Curls'],
   Tuesday: [],

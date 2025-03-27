@@ -292,6 +292,19 @@ export function Sidebar() {
                 
                 <SheetFooter className="p-6 pt-0">
                   <div className="flex flex-col items-center space-y-4 w-full">
+                    {authUser && (
+                      <button 
+                        className="w-full p-3 rounded-md bg-primary/80 hover:bg-primary transition-colors text-white font-medium"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpen(false); // Close sidebar before navigating 
+                          router.push('/settings/subscription');
+                        }}
+                      >
+                        Manage Subscription
+                      </button>
+                    )}
+                    
                     {authUser ? (
                       <button 
                         className="w-full p-3 rounded-md bg-white/10 hover:bg-white/20 transition-colors text-white font-medium"
