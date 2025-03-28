@@ -41,7 +41,10 @@ export function WorkoutManagement() {
     selectedDay, 
     currentUser, 
     setCurrentUser, 
+    // These are fetched but not used directly in this component
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     subscriptionPlan, 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     canAddMoreWorkoutDays,
     userDayCount,
     maxWorkoutDays

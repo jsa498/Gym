@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import { OnboardingCheck } from '@/components/onboarding-check';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -22,7 +22,17 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { useSearchParams, useRouter } from 'next/navigation';
 import { toast } from '@/components/ui/use-toast';
 
+// Wrap the component with Suspense for useSearchParams
 export default function SubscriptionPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-black text-white flex items-center justify-center">Loading...</div>}>
+      <SubscriptionPageContent />
+    </Suspense>
+  );
+}
+
+// Actual implementation moved to a separate component
+function SubscriptionPageContent() {
   const { userDayCount, maxWorkoutDays, subscriptionPlan: contextPlan } = useWorkout();
   const [isLoading, setIsLoading] = useState(false);
   const [userPlan, setUserPlan] = useState(contextPlan);
@@ -59,6 +69,27 @@ export default function SubscriptionPage() {
     fetchUserPlan();
   }, [user]);
 
+  // Function to refresh subscription data from the database using useCallback to avoid dependency issues
+  const refreshSubscriptionData = useCallback(async () => {
+    if (!user) return;
+    
+    try {
+      const { data: userData, error: userError } = await supabase
+        .from('profiles')
+        .select('subscription_plan, subscription_updated_at')
+        .eq('id', user.id)
+        .single();
+
+      if (userError && userError.code !== 'PGRST116') throw userError;
+      
+      if (userData) {
+        setUserPlan(userData.subscription_plan || 'free');
+      }
+    } catch (error) {
+      console.error('Error fetching user subscription plan:', error);
+    }
+  }, [user, setUserPlan]);
+  
   // Check for URL parameters after Stripe checkout
   useEffect(() => {
     if (!user) return;
@@ -84,10 +115,25 @@ export default function SubscriptionPage() {
           });
           
           if (!response.ok) {
-            throw new Error('Failed to update subscription');
+            console.error(`Error updating subscription: ${response.status} ${response.statusText}`);
+            let errorMessage = 'Failed to update subscription';
+            try {
+              const errorData = await response.json();
+              if (errorData.error) {
+                errorMessage = errorData.error;
+              }
+            } catch (parseError) {
+              console.error('Failed to parse error response:', parseError);
+            }
+            throw new Error(errorMessage);
           }
           
-          setUserPlan(plan as SubscriptionPlan);
+          // Wait for database update to complete
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          // Refresh subscription data from the database to ensure we have latest state
+          await refreshSubscriptionData();
+          
           setShowUpgradeDialog(true);
           toast({
             title: 'Subscription Updated',
@@ -110,7 +156,7 @@ export default function SubscriptionPage() {
         description: 'You have canceled the checkout process.',
       });
     }
-  }, [searchParams, user]);
+  }, [searchParams, user, refreshSubscriptionData]);
 
   // Handle upgrading the user's subscription
   const handleUpgrade = async (planName: SubscriptionPlan) => {
@@ -132,7 +178,17 @@ export default function SubscriptionPage() {
         });
         
         if (!updateResponse.ok) {
-          throw new Error('Failed to update subscription');
+          console.error(`Error updating subscription: ${updateResponse.status} ${updateResponse.statusText}`);
+          let errorMessage = 'Failed to update subscription';
+          try {
+            const errorData = await updateResponse.json();
+            if (errorData.error) {
+              errorMessage = errorData.error;
+            }
+          } catch (parseError) {
+            console.error('Failed to parse error response:', parseError);
+          }
+          throw new Error(errorMessage);
         }
         
         setUserPlan(planName);
@@ -154,12 +210,35 @@ export default function SubscriptionPage() {
         }),
       });
       
-      const { url, error, free } = await response.json();
+      if (!response.ok) {
+        console.error('API response error:', response.status, response.statusText);
+        let errorMessage = 'Failed to create checkout session. Please try again.';
+        
+        try {
+          const errorData = await response.json();
+          if (errorData.error) {
+            errorMessage = errorData.error;
+          }
+        } catch (parseError) {
+          console.error('Error parsing error response:', parseError);
+        }
+        
+        toast({
+          title: 'Error',
+          description: errorMessage,
+          variant: 'destructive',
+        });
+        setIsLoading(false);
+        return;
+      }
+      
+      const data = await response.json();
+      const { url, error, free } = data;
       
       if (error) {
         toast({
           title: 'Error',
-          description: 'Failed to create checkout session. Please try again.',
+          description: error,
           variant: 'destructive',
         });
         setIsLoading(false);

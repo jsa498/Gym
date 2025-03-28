@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { useRouter } from 'next/navigation';
 import { toast } from '@/components/ui/use-toast';
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 interface SubscriptionPlan {
   id: number;
   name: string;
@@ -24,6 +25,8 @@ interface SubscriptionPlan {
 
 export function SubscriptionPlans() {
   // Hard-code the plans rather than relying on database
+  // Plans are defined here but not used directly as we're using hardcoded UI components
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const plans = [
     {
       id: 1,
@@ -59,6 +62,7 @@ export function SubscriptionPlans() {
   const [upgrading, setUpgrading] = useState<string | null>(null);
   const { user } = useAuth();
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const router = useRouter();
 
   useEffect(() => {
@@ -89,6 +93,27 @@ export function SubscriptionPlans() {
     fetchUserPlan();
   }, [user]);
 
+  // Function to refresh subscription data from the database
+  const refreshSubscriptionData = async () => {
+    if (!user) return;
+    
+    try {
+      const { data: userData, error: userError } = await supabase
+        .from('profiles')
+        .select('subscription_plan, subscription_updated_at')
+        .eq('id', user.id)
+        .single();
+
+      if (userError && userError.code !== 'PGRST116') throw userError;
+      
+      if (userData) {
+        setUserPlan(userData.subscription_plan || 'free');
+      }
+    } catch (error) {
+      console.error('Error fetching user subscription plan:', error);
+    }
+  };
+
   const handleUpgrade = async (planName: string) => {
     if (!user) return;
     
@@ -110,10 +135,25 @@ export function SubscriptionPlans() {
         });
         
         if (!updateResponse.ok) {
-          throw new Error('Failed to update subscription');
+          console.error(`Error updating subscription: ${updateResponse.status} ${updateResponse.statusText}`);
+          let errorMessage = 'Failed to update subscription';
+          try {
+            const errorData = await updateResponse.json();
+            if (errorData.error) {
+              errorMessage = errorData.error;
+            }
+          } catch (parseError) {
+            console.error('Failed to parse error response:', parseError);
+          }
+          throw new Error(errorMessage);
         }
         
-        setUserPlan(planName);
+        // Wait for database update to complete
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Refresh subscription data from the database to ensure we have latest state
+        await refreshSubscriptionData();
+        
         setShowUpgradeDialog(true);
         setUpgrading(null);
         return;
@@ -128,15 +168,39 @@ export function SubscriptionPlans() {
         body: JSON.stringify({
           planId: planName,
           userId: user.id,
+          userEmail: user.email
         }),
       });
       
-      const { url, error, free } = await response.json();
+      if (!response.ok) {
+        console.error('API response error:', response.status, response.statusText);
+        let errorMessage = 'Failed to create checkout session. Please try again.';
+        
+        try {
+          const errorData = await response.json();
+          if (errorData.error) {
+            errorMessage = errorData.error;
+          }
+        } catch (parseError) {
+          console.error('Error parsing error response:', parseError);
+        }
+        
+        toast({
+          title: 'Error',
+          description: errorMessage,
+          variant: 'destructive',
+        });
+        setUpgrading(null);
+        return;
+      }
+      
+      const data = await response.json();
+      const { url, error, free } = data;
       
       if (error) {
         toast({
           title: 'Error',
-          description: 'Failed to create checkout session. Please try again.',
+          description: error,
           variant: 'destructive',
         });
         setUpgrading(null);
@@ -145,7 +209,12 @@ export function SubscriptionPlans() {
       
       // If it's a free plan, no need to redirect to Stripe
       if (free) {
-        setUserPlan(planName);
+        // Wait for database update to complete
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Refresh subscription data from the database to ensure we have latest state
+        await refreshSubscriptionData();
+        
         setShowUpgradeDialog(true);
         setUpgrading(null);
         return;

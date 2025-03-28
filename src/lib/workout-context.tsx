@@ -303,7 +303,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       )
       .subscribe();
       
-    // Subscribe to profiles table for buddy changes
+    // Subscribe to profiles table for buddy changes and subscription updates
     const profilesChannel = supabase
       .channel('profiles_changes')
       .on(
@@ -314,8 +314,17 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
           table: 'profiles',
           filter: `id=eq.${authUser.id}`  // Only listen to changes for this user's profile
         },
-        () => {
-          // Refresh users when profile changes (buddy added/removed)
+        (payload: { 
+          new: { subscription_plan?: string } | null; 
+          old: { subscription_plan?: string } | null; 
+        }) => {
+          console.log('Profile change detected:', payload);
+          // Check if subscription_plan was updated
+          if (payload.new?.subscription_plan !== payload.old?.subscription_plan) {
+            console.log(`Subscription changed from ${payload.old?.subscription_plan} to ${payload.new?.subscription_plan}`);
+            setSubscriptionPlan(payload.new?.subscription_plan as SubscriptionPlan);
+          }
+          // Refresh users when profile changes (buddy added/removed or subscription changed)
           fetchUsers();
         }
       )

@@ -31,8 +31,8 @@ export function SubscriptionStatus() {
         isFreePlan 
           ? 'bg-white/10 text-white/70 hover:bg-white/20' 
           : isPlusPlan 
-            ? 'bg-primary/20 text-primary hover:bg-primary/30' 
-            : 'bg-gradient-to-r from-purple-500/30 to-indigo-500/30 text-white hover:from-purple-500/40 hover:to-indigo-500/40'
+            ? 'bg-white/20 text-white hover:bg-white/30' 
+            : 'bg-white/20 text-white hover:bg-white/30'
       }`}
       onClick={goToSubscriptionPage}
     >

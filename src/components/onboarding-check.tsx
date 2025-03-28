@@ -5,7 +5,7 @@ import { supabase, applyDatabaseFixes, createSupportFunctions } from '@/lib/supa
 import { useAuth } from '@/lib/auth-context';
 import { PostSignupSetup } from './post-signup-setup';
 
-export function OnboardingCheck({ children }: { children: ReactNode }) {
+export function OnboardingCheck({ children }: { children?: ReactNode }) {
   const { user } = useAuth();
   const [showSetup, setShowSetup] = useState(false);
   const [isChecking, setIsChecking] = useState(true);

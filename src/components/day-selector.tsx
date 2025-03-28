@@ -18,9 +18,13 @@ export function DaySelector() {
     selectedDay, 
     setSelectedDay, 
     currentUser, 
+    // These are fetched but not used directly in this component
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     subscriptionPlan, 
     canAddMoreWorkoutDays,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     userDayCount,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     maxWorkoutDays
   } = useWorkout();
   const [availableDays, setAvailableDays] = useState<Day[]>([]);
@@ -118,6 +122,7 @@ export function DaySelector() {
   }, [selectedDay, availableDays]);
   
   // Function to add a new day (with subscription check)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleAddDay = async () => {
     if (!canAddMoreWorkoutDays) {
       setShowUpgradeModal(true);
@@ -178,42 +183,6 @@ export function DaySelector() {
               ))}
             </SelectContent>
           </Select>
-        )}
-      </div>
-      
-      {/* Subscription info and button to add more days */}
-      <div className="flex items-center justify-center gap-4">
-        <div className="text-sm text-white/60 flex items-center">
-          <span className={`mr-1.5 ${userDayCount === maxWorkoutDays && maxWorkoutDays !== 999 ? 'text-yellow-400' : ''}`}>
-            {userDayCount} / {maxWorkoutDays === 999 ? "∞" : maxWorkoutDays} workout days
-          </span>
-          {subscriptionPlan !== 'free' ? (
-            <span className="bg-primary/20 text-primary rounded-full px-2 py-0.5 text-xs font-medium">
-              {subscriptionPlan.charAt(0).toUpperCase() + subscriptionPlan.slice(1)}
-            </span>
-          ) : (
-            <span 
-              className="text-xs underline text-primary/80 cursor-pointer hover:text-primary"
-              onClick={() => window.location.href = '/settings/subscription'}
-            >
-              Upgrade
-            </span>
-          )}
-        </div>
-        
-        {availableDays.length < 7 && (
-          <button
-            onClick={handleAddDay}
-            className={`px-3 py-1 rounded-md text-sm ${
-              canAddMoreWorkoutDays
-                ? 'bg-primary hover:bg-primary/80'
-                : 'bg-gray-500/80 cursor-not-allowed'
-            } text-white transition-colors`}
-            disabled={!canAddMoreWorkoutDays}
-            title={!canAddMoreWorkoutDays ? "Upgrade your plan to add more workout days" : "Add a new workout day"}
-          >
-            Add Workout Day
-          </button>
         )}
       </div>
       
