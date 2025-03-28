@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, ReactNode } from 'react';
 import { supabase, applyDatabaseFixes, createSupportFunctions } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { PostSignupSetup } from './post-signup-setup';
 
-export function OnboardingCheck() {
+export function OnboardingCheck({ children }: { children?: ReactNode }) {
   const { user } = useAuth();
   const [showSetup, setShowSetup] = useState(false);
   const [isChecking, setIsChecking] = useState(true);
@@ -73,12 +73,14 @@ export function OnboardingCheck() {
     checkSetupStatus();
   }, [user]);
   
-  if (isChecking || !user) {
-    return null;
+  if (isChecking) {
+    return <div className="text-center py-8 text-white">Loading...</div>;
   }
   
   return (
     <>
+      {children}
+      
       {showSetup && userId && (
         <PostSignupSetup
           isOpen={showSetup}

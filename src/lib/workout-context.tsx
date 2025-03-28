@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { Day, ExerciseSet, exercises as defaultExercises } from './types';
+import { Day, ExerciseSet, exercises as defaultExercises, SubscriptionPlan, subscriptionLimits } from './types';
 import { supabase, applyDatabaseFixes } from './supabase';
 import { useAuth } from './auth-context';
 
@@ -16,6 +16,10 @@ interface WorkoutContextProps {
   exercisesForSelectedDay: string[];
   users: string[];
   removeUserFromState: (username: string) => void;
+  subscriptionPlan: SubscriptionPlan;
+  canAddMoreWorkoutDays: boolean;
+  userDayCount: number;
+  maxWorkoutDays: number;
 }
 
 const WorkoutContext = createContext<WorkoutContextProps | undefined>(undefined);
@@ -26,7 +30,13 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   const [exerciseSets, setExerciseSets] = useState<Record<string, ExerciseSet[]>>({});
   const [exercisesByDay, setExercisesByDay] = useState<Record<Day, string[]>>(defaultExercises);
   const [users, setUsers] = useState<string[]>([]);
+  const [subscriptionPlan, setSubscriptionPlan] = useState<SubscriptionPlan>('free');
+  const [userDayCount, setUserDayCount] = useState<number>(0);
   const { user: authUser } = useAuth();
+  
+  // Computed properties based on subscription
+  const maxWorkoutDays = subscriptionLimits[subscriptionPlan].maxWorkoutDays;
+  const canAddMoreWorkoutDays = userDayCount < maxWorkoutDays;
 
   // Enhanced setCurrentUser that handles the case where a user is deleted
   const setCurrentUser = useCallback((user: string) => {
@@ -74,14 +84,30 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      // Get profile information
+      // Get profile information including subscription data
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .select('display_name, has_buddy, buddy_name')
+        .select('display_name, has_buddy, buddy_name, subscription_plan, subscription_updated_at')
         .eq('id', authUser.id)
         .single();
         
       if (profileError) throw profileError;
+      
+      // Update subscription plan if available
+      if (profileData?.subscription_plan) {
+        setSubscriptionPlan(profileData.subscription_plan as SubscriptionPlan);
+      }
+      
+      // Fetch user day count to check subscription limits
+      const { data: userDays, error: daysCountError } = await supabase
+        .from('user_days')
+        .select('day', { count: 'exact' })
+        .eq('auth_id', authUser.id)
+        .eq('username', profileData.display_name);
+        
+      if (!daysCountError) {
+        setUserDayCount(userDays?.length || 0);
+      }
       
       // Get users owned by the current auth user
       const { data: ownedUsers, error: usersError } = await supabase
@@ -142,10 +168,10 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         // Ensure database is fixed
         await applyDatabaseFixes();
         
-        // Get user profile
+        // Get user profile including subscription data
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
-          .select('display_name, has_buddy, buddy_name')
+          .select('display_name, has_buddy, buddy_name, subscription_plan, subscription_updated_at')
           .eq('id', authUser.id)
           .single();
 
@@ -163,13 +189,15 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
                 display_name: displayName,
                 has_buddy: false,
                 buddy_name: null,
-                template_preference: null
+                template_preference: null,
+                subscription_plan: 'free',
+                subscription_updated_at: new Date().toISOString()
               });
               
             // Try again after creating
             const { data: newProfile, error: newProfileError } = await supabase
               .from('profiles')
-              .select('display_name, has_buddy, buddy_name')
+              .select('display_name, has_buddy, buddy_name, subscription_plan, subscription_updated_at')
               .eq('id', authUser.id)
               .single();
               
@@ -178,6 +206,11 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
             // Use the newly created profile
             if (newProfile) {
               setCurrentUser(newProfile.display_name);
+              
+              // Set subscription plan
+              if (newProfile.subscription_plan) {
+                setSubscriptionPlan(newProfile.subscription_plan as SubscriptionPlan);
+              }
               
               // Fetch users separately
               await fetchUsers();
@@ -192,9 +225,14 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
 
               if (daysError) throw daysError;
 
-              if (userDays && userDays.length > 0) {
-                // Set the first day as selected
-                setSelectedDay(userDays[0].day as Day);
+              if (userDays) {
+                // Update day count for subscription limits
+                setUserDayCount(userDays.length);
+                
+                if (userDays.length > 0) {
+                  // Set the first day as selected
+                  setSelectedDay(userDays[0].day as Day);
+                }
               }
             }
           } else {
@@ -202,6 +240,11 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
           }
         } else if (profileData) {
           setCurrentUser(profileData.display_name);
+          
+          // Set subscription plan
+          if (profileData.subscription_plan) {
+            setSubscriptionPlan(profileData.subscription_plan as SubscriptionPlan);
+          }
           
           // Fetch users separately
           await fetchUsers();
@@ -216,9 +259,14 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
 
           if (daysError) throw daysError;
 
-          if (userDays && userDays.length > 0) {
-            // Set the first day as selected
-            setSelectedDay(userDays[0].day as Day);
+          if (userDays) {
+            // Update day count for subscription limits
+            setUserDayCount(userDays.length);
+            
+            if (userDays.length > 0) {
+              // Set the first day as selected
+              setSelectedDay(userDays[0].day as Day);
+            }
           }
         }
       } catch (error) {
@@ -255,7 +303,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       )
       .subscribe();
       
-    // Subscribe to profiles table for buddy changes
+    // Subscribe to profiles table for buddy changes and subscription updates
     const profilesChannel = supabase
       .channel('profiles_changes')
       .on(
@@ -266,8 +314,17 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
           table: 'profiles',
           filter: `id=eq.${authUser.id}`  // Only listen to changes for this user's profile
         },
-        () => {
-          // Refresh users when profile changes (buddy added/removed)
+        (payload: { 
+          new: { subscription_plan?: string } | null; 
+          old: { subscription_plan?: string } | null; 
+        }) => {
+          console.log('Profile change detected:', payload);
+          // Check if subscription_plan was updated
+          if (payload.new?.subscription_plan !== payload.old?.subscription_plan) {
+            console.log(`Subscription changed from ${payload.old?.subscription_plan} to ${payload.new?.subscription_plan}`);
+            setSubscriptionPlan(payload.new?.subscription_plan as SubscriptionPlan);
+          }
+          // Refresh users when profile changes (buddy added/removed or subscription changed)
           fetchUsers();
         }
       )
@@ -495,6 +552,10 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         exercisesForSelectedDay: exercisesByDay[selectedDay] || [],
         users,
         removeUserFromState,
+        subscriptionPlan,
+        canAddMoreWorkoutDays,
+        userDayCount,
+        maxWorkoutDays,
       }}
     >
       {children}

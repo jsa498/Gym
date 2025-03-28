@@ -37,7 +37,18 @@ interface ExerciseInsert {
 }
 
 export function WorkoutManagement() {
-  const { selectedDay, currentUser, setCurrentUser } = useWorkout();
+  const { 
+    selectedDay, 
+    currentUser, 
+    setCurrentUser, 
+    // These are fetched but not used directly in this component
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    subscriptionPlan, 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    canAddMoreWorkoutDays,
+    userDayCount,
+    maxWorkoutDays
+  } = useWorkout();
   const { user: authUser } = useAuth();
   const [workoutDays, setWorkoutDays] = useState<Day[]>(
     currentUser === 'Babli' 
@@ -476,6 +487,18 @@ export function WorkoutManagement() {
       return;
     }
     
+    // Check subscription limit for workout days
+    const daysToAdd = selectedDays.filter(day => !availableDays.includes(day));
+    if (userDayCount + daysToAdd.length > maxWorkoutDays) {
+      // Show subscription upgrade modal
+      setAddDayDialogOpen(false);
+      setTimeout(() => {
+        const upgradeEvent = new CustomEvent('showUpgradeModal', { detail: { exceeded: true } });
+        window.dispatchEvent(upgradeEvent);
+      }, 500);
+      return;
+    }
+    
     setIsLoading(true);
     try {
       // Create array of day objects to insert
@@ -484,7 +507,8 @@ export function WorkoutManagement() {
         .map(day => ({ 
           username: selectedUser, 
           day: day,
-          day_order: getDayOrder(day)
+          day_order: getDayOrder(day),
+          auth_id: authUser.id
         }));
       
       if (daysToInsert.length === 0) {
