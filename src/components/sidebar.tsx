@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Users, Dumbbell, Settings as SettingsIcon, Menu } from 'lucide-react';
+import { Users, Dumbbell, Settings as SettingsIcon, Menu, Moon, Sun } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { 
   Sheet, 
@@ -19,12 +19,13 @@ import { WorkoutManagement } from './workout-management';
 import { Settings } from './settings';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
+import { useTheme } from '@/lib/theme-context';
 
 type SettingsView = 'users' | 'workouts' | 'settings' | null;
 
 export function Sidebar() {
   const [open, setOpen] = useState(false);
-  const { currentUser } = useWorkout();
+  const { currentUser, subscriptionPlan, userDayCount, maxWorkoutDays } = useWorkout();
   const [activeView, setActiveView] = useState<SettingsView>(null);
   const navRef = useRef<HTMLDivElement>(null);
   const hoverTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -32,6 +33,7 @@ export function Sidebar() {
   const [isMobile, setIsMobile] = useState(false);
   const router = useRouter();
   const { user: authUser, signOut } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   
   // Check if device is mobile based on screen width
   useEffect(() => {
@@ -157,18 +159,40 @@ export function Sidebar() {
 
   return (
     <>
-      {/* Mobile hamburger menu - fixed positioning to overlay on content */}
+      {/* Mobile hamburger menu - centered pill with subscription info */}
       {isMobile && (
-        <div className="fixed top-4 left-4 z-50">
-          <button 
-            onClick={toggleMenu}
-            className="p-3 rounded-full bg-black/90 text-white shadow-lg shadow-black/20 hover:bg-black transition-colors animate-pulse-once flex items-center"
-            aria-label="Menu"
-            title="Open Menu"
-          >
-            <Menu className="h-6 w-6" />
-            <span className="ml-2 text-sm font-medium sr-only">Menu</span>
-          </button>
+        <div className="fixed top-2 left-0 right-0 z-50 flex justify-center">
+          <div className="flex items-center justify-between p-2 px-4 bg-black/90 rounded-full shadow-lg shadow-black/20 max-w-[95%] w-auto">
+            <div className="flex items-center">
+              <img src="/fitbull.png" alt="FitBull logo" className="h-5 w-5 mr-2" />
+              <span className="font-semibold text-white">FitBull</span>
+            </div>
+            
+            <div className="flex items-center ml-4">
+              {/* Dark mode toggle button */}
+              <button 
+                onClick={toggleTheme}
+                className="p-2 text-white hover:bg-white/10 rounded-full transition-colors"
+                aria-label="Toggle dark mode"
+                title="Toggle dark mode"
+              >
+                {theme === 'dark' ? (
+                  <Sun className="h-5 w-5" />
+                ) : (
+                  <Moon className="h-5 w-5" />
+                )}
+              </button>
+              
+              <button 
+                onClick={toggleMenu}
+                className="p-2 ml-1 text-white hover:bg-white/10 rounded-full transition-colors"
+                aria-label="Menu"
+                title="Open Menu"
+              >
+                <Menu className="h-5 w-5" />
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -182,13 +206,32 @@ export function Sidebar() {
           >
             {/* Collapsed sidebar with icons - only show when sidebar is collapsed */}
             {!open && (
-              <div className="w-14 bg-black/90 h-full flex flex-col items-center pt-16 space-y-8 border-r border-white/10">
+              <div className="w-14 bg-black/90 h-full flex flex-col items-center pt-8 space-y-8 border-r border-white/10">
+                <div className="mb-4">
+                  <img src="/fitbull.png" alt="FitBull logo" className="h-8 w-8" />
+                </div>
+                
+                {/* Dark mode toggle for desktop */}
+                <button 
+                  onClick={toggleTheme}
+                  className="text-white/70 hover:text-white transition-colors cursor-pointer sidebar-icon"
+                  aria-label="Toggle dark mode"
+                  title="Toggle dark mode"
+                >
+                  {theme === 'dark' ? (
+                    <Sun className="h-5 w-5" />
+                  ) : (
+                    <Moon className="h-5 w-5" />
+                  )}
+                </button>
+                
                 {menuItems.map((item, index) => (
                   <div 
                     key={index}
                     className="text-white/70 hover:text-white transition-colors cursor-pointer sidebar-icon"
                     onClick={(e) => {
                       e.stopPropagation();
+                      // Just set the active view without closing
                       setActiveView(item.id);
                       setOpen(true);
                     }}
@@ -258,10 +301,26 @@ export function Sidebar() {
               // Menu list view
               <>
                 <SheetHeader className="p-6 pb-2">
-                  <SheetTitle className="text-xl font-bold text-white">Workout Tracker</SheetTitle>
+                  <SheetTitle className="text-xl font-bold text-white flex items-center">
+                    <img src="/fitbull.png" alt="FitBull logo" className="h-6 w-6 mr-2" />
+                    FitBull
+                  </SheetTitle>
                   <SheetDescription className="text-white/70">
                     {authUser ? `Logged in as ${authUser.email}` : `Workout for ${currentUser}`}
                   </SheetDescription>
+                  
+                  {/* Subscription plan indicator for mobile (placed in the sidebar) */}
+                  {isMobile && authUser && (
+                    <div className="mt-3 flex items-center">
+                      <div className="flex items-center bg-black/60 rounded-full px-3 py-1 text-sm">
+                        <span className="mr-1">✨</span>
+                        <span className="font-medium text-white/90">{subscriptionPlan.charAt(0).toUpperCase() + subscriptionPlan.slice(1)} Plan</span>
+                        <span className="ml-2 bg-white/20 rounded-full px-2 py-0.5 text-white/90">
+                          {userDayCount}/{maxWorkoutDays}
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </SheetHeader>
                 
                 <div className="p-6 space-y-6 flex-1">

@@ -49,10 +49,13 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-black text-white">
-      <div className={`fixed top-4 right-4 z-30 ${isMobile ? 'right-4' : 'right-6'}`}>
-        {subscriptionStatus}
-      </div>
-      <div className={`max-w-3xl mx-auto px-4 py-12 ${isMobile ? 'pl-4' : 'pl-24'} sm:pl-24`}>
+      {/* Only show subscription status on desktop */}
+      {!isMobile && (
+        <div className="fixed top-4 right-6 z-30">
+          {subscriptionStatus}
+        </div>
+      )}
+      <div className={`max-w-3xl mx-auto px-4 ${isMobile ? 'pt-16 pb-12 pl-4' : 'py-12 pl-24'} sm:pl-24`}>
         <div className="space-y-8">
           {userSelector}
           {daySelector}

@@ -6,12 +6,22 @@ import { Sidebar } from '@/components/sidebar';
 import { AuthProvider } from '@/lib/auth-context';
 import { OnboardingCheck } from '@/components/onboarding-check';
 import { Toaster } from '@/components/ui/toaster';
+import { ThemeProvider } from '@/lib/theme-context';
 
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Workout Tracker',
-  description: 'Track your workouts with this modern app',
+  title: 'FitBull',
+  description: 'Build strength and track your workouts with FitBull',
+  manifest: '/site.webmanifest',
+  icons: {
+    icon: [
+      { url: '/fitbull.ico?v=1', sizes: 'any' },
+      { url: '/fitbull.png?v=1', type: 'image/png' }
+    ],
+    apple: '/fitbull.png?v=1',
+    shortcut: '/fitbull.ico?v=1',
+  },
 };
 
 export default function RootLayout({
@@ -23,12 +33,14 @@ export default function RootLayout({
     <html lang="en">
       <body className={inter.className}>
         <AuthProvider>
-          <WorkoutProvider>
-            <Sidebar />
-            {children}
-            <OnboardingCheck />
-            <Toaster />
-          </WorkoutProvider>
+          <ThemeProvider>
+            <WorkoutProvider>
+              <Sidebar />
+              {children}
+              <OnboardingCheck />
+              <Toaster />
+            </WorkoutProvider>
+          </ThemeProvider>
         </AuthProvider>
       </body>
     </html>

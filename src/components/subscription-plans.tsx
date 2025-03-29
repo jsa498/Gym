@@ -503,64 +503,83 @@ export function SubscriptionPlans() {
 export function UpgradeModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
-        <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 bg-primary text-white p-3 rounded-full">
-          <Zap className="h-6 w-6" />
+      <DialogContent className="sm:max-w-md bg-black border border-white/20 shadow-xl rounded-xl p-0 overflow-hidden">
+        {/* Top banner with lightning icon */}
+        <div className="w-full bg-gradient-to-r from-white/10 to-white/5 py-5 relative">
+          <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white text-black p-3 rounded-full shadow-md">
+            <Zap className="h-6 w-6" />
+          </div>
+          <DialogHeader className="pt-6 px-6">
+            <DialogTitle className="text-2xl font-bold text-center text-white">
+              Workout Day Limit Reached
+            </DialogTitle>
+            <DialogDescription className="text-center text-white/80 mt-2">
+              You&apos;ve reached the maximum of 3 workout days on your free plan.
+            </DialogDescription>
+          </DialogHeader>
         </div>
         
-        <DialogHeader className="pt-6">
-          <DialogTitle className="text-xl text-center">Workout Day Limit Reached</DialogTitle>
-          <DialogDescription className="text-center">
-            You&apos;ve reached the maximum of 3 workout days on your free plan.
-            Upgrade to Plus for unlimited workout days and more features!
-          </DialogDescription>
-        </DialogHeader>
-        
-        <div className="my-4 p-4 rounded-lg bg-gradient-to-br from-primary/5 to-primary/10 border border-primary/20">
-          <h3 className="font-semibold text-center mb-3 text-primary">Plus Plan Benefits</h3>
-          <div className="grid gap-3">
-            <div className="flex items-center gap-3">
-              <div className="bg-primary/10 p-1.5 rounded-full">
-                <Calendar className="h-4 w-4 text-primary" />
-              </div>
-              <span className="text-sm">Unlimited workout days</span>
+        {/* Main content */}
+        <div className="px-6 py-4">
+          {/* Premium plan card */}
+          <div className="mb-6 bg-white/5 border border-white/10 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-bold text-lg text-white flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-white" /> 
+                Plus Plan
+              </h3>
+              <Badge variant="outline" className="bg-white/10 text-white border-white/20 px-3">
+                Recommended
+              </Badge>
             </div>
-            <div className="flex items-center gap-3">
-              <div className="bg-primary/10 p-1.5 rounded-full">
-                <Zap className="h-4 w-4 text-primary" />
-              </div>
-              <span className="text-sm">Advanced workout tracking</span>
+            
+            <ul className="space-y-3">
+              <li className="flex items-center gap-3 text-white/90">
+                <CheckCircle2 className="h-5 w-5 text-white" />
+                <span>Unlimited workout days</span>
+              </li>
+              <li className="flex items-center gap-3 text-white/90">
+                <CheckCircle2 className="h-5 w-5 text-white" />
+                <span>Advanced workout tracking</span>
+              </li>
+              <li className="flex items-center gap-3 text-white/90">
+                <CheckCircle2 className="h-5 w-5 text-white" />
+                <span>Progress analytics</span>
+              </li>
+              <li className="flex items-center gap-3 text-white/90">
+                <CheckCircle2 className="h-5 w-5 text-white" />
+                <span>Priority support</span>
+              </li>
+            </ul>
+          </div>
+          
+          {/* Price display */}
+          <div className="text-center mb-6">
+            <div className="flex items-center justify-center gap-1">
+              <span className="text-3xl font-bold text-white">$5</span>
+              <span className="text-sm text-white/60">/month</span>
             </div>
-            <div className="flex items-center gap-3">
-              <div className="bg-primary/10 p-1.5 rounded-full">
-                <Timer className="h-4 w-4 text-primary" />
-              </div>
-              <span className="text-sm">Progress analytics</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="bg-primary/10 p-1.5 rounded-full">
-                <Star className="h-4 w-4 text-primary" />
-              </div>
-              <span className="text-sm">Priority support</span>
-            </div>
+            <p className="text-white/60 text-sm mt-1">Cancel anytime • Instant access</p>
+          </div>
+          
+          {/* Action buttons */}
+          <div className="space-y-3">
+            <Button 
+              className="w-full py-6 text-base font-semibold bg-white text-black hover:bg-white/90 transition-all"
+              onClick={() => window.location.href = '/settings/subscription'}
+            >
+              Upgrade to Plus
+            </Button>
+            
+            <Button 
+              variant="outline" 
+              className="w-full py-5 text-base bg-zinc-900 border-white/10 text-white hover:bg-zinc-800 hover:text-white transition-all" 
+              onClick={onClose}
+            >
+              Maybe Later
+            </Button>
           </div>
         </div>
-        
-        <div className="text-center py-2 mb-2">
-          <p className="text-xl font-bold">$5<span className="text-sm font-normal text-muted-foreground">/month</span></p>
-        </div>
-        
-        <DialogFooter className="flex flex-col gap-3">
-          <Button 
-            className="w-full py-6 text-base font-medium bg-primary hover:bg-primary/90"
-            onClick={() => window.location.href = '/settings/subscription'}
-          >
-            Upgrade to Plus
-          </Button>
-          <Button variant="outline" className="w-full" onClick={onClose}>
-            Maybe Later
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
